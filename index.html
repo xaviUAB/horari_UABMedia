@@ -1,0 +1,1937 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control Horari Corporatiu - UABMèdia</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .modal-overlay { background-color: rgba(0,0,0,0.5); }
+        .btn-active:active { transform: scale(0.98); }
+        
+        /* Animació d'èxit */
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            70% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+        .animate-pop-in {
+            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        .animate-fade-out {
+            animation: fadeOut 0.3s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen selection:bg-indigo-100 relative">
+
+    <!-- Bàner de connexió perduda -->
+    <div id="offline-banner" class="hidden bg-yellow-400 text-yellow-900 px-4 py-2 text-center text-sm font-bold flex items-center justify-center gap-2 shadow-md z-[200] relative">
+        <i data-lucide="wifi-off" class="w-4 h-4"></i> Sense connexió. Els registres es desaran localment i s'enviaran en tornar la xarxa.
+    </div>
+
+    <!-- Microanimació d'èxit central -->
+    <div id="success-overlay" class="hidden fixed inset-0 z-[250] flex items-center justify-center pointer-events-none">
+        <div class="bg-white rounded-full p-6 shadow-2xl flex flex-col items-center justify-center gap-4 border-4 border-emerald-500 animate-pop-in">
+            <div class="bg-emerald-500 text-white rounded-full p-4">
+                <i data-lucide="check" class="w-12 h-12 stroke-[3]"></i>
+            </div>
+            <p class="font-bold text-slate-800 text-lg">Registre guardat</p>
+        </div>
+    </div>
+
+    <div id="app" class="max-w-6xl mx-auto p-4 md:p-8">
+        <header class="flex flex-col md:flex-row justify-between items-center mb-8 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <div class="flex items-center gap-4">
+                <div onclick="openAdminLogin()" class="bg-indigo-600 p-3 rounded-xl text-white cursor-pointer hover:bg-indigo-700 transition-all shadow-lg group">
+                    <i data-lucide="clock" class="w-8 h-8 group-hover:rotate-12 transition-transform"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Registre Horari v6.9</h1>
+                    <p id="status-badge" class="text-sm font-medium mt-1 flex items-center gap-1"></p>
+                </div>
+            </div>
+            <div class="text-right mt-4 md:mt-0">
+                <p id="current-time" class="text-xl font-mono font-bold text-slate-700">00:00:00</p>
+                <div class="flex flex-col items-end gap-1">
+                    <p id="current-date" class="text-slate-500 text-xs uppercase tracking-widest"></p>
+                    <button onclick="openSelfRegisterModal()" class="w-6 h-6 rounded-full bg-slate-100 border border-slate-200 text-slate-400 flex items-center justify-center hover:bg-indigo-100 hover:text-indigo-600 hover:border-indigo-200 transition-all shadow-sm mt-1" title="Crear nova persona usuària">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Pantalla de Bloqueig -->
+        <div id="lock-screen" class="hidden bg-white rounded-3xl p-12 shadow-xl border-2 border-dashed border-slate-300 text-center">
+            <div class="bg-rose-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i data-lucide="shield-alert" class="text-rose-600 w-10 h-10"></i>
+            </div>
+            <h2 id="lock-screen-title" class="text-2xl font-bold text-slate-800 mb-4">Terminal No Autoritzat</h2>
+            <p class="text-slate-600 mb-8 max-w-md mx-auto italic">Configura aquest dispositiu com a punt de control físic validat.</p>
+            <button onclick="toggleAdminForm()" class="bg-slate-800 text-white px-6 py-3 rounded-xl font-medium hover:bg-slate-700 transition-colors flex items-center gap-2 mx-auto shadow-md">
+                <i data-lucide="laptop" class="w-5 h-5"></i> Autoritzar terminal
+            </button>
+            <div id="admin-form" class="hidden mt-6 max-w-xs mx-auto space-y-4">
+                <input type="password" id="admin-pass" placeholder="Paraula de pas Supervisor" class="w-full p-3 border-2 border-slate-200 rounded-xl outline-none focus:border-indigo-500 transition-colors" onkeydown="if(event.key === 'Enter') authorizeTerminal()">
+                <p id="auth-error" class="hidden text-rose-600 text-xs font-bold text-center">Codi incorrecte</p>
+                <div class="flex gap-2">
+                    <button onclick="toggleAdminForm()" class="flex-1 px-4 py-2 text-slate-600 font-medium hover:bg-slate-50 rounded-xl">Cancel·lar</button>
+                    <button id="btn-confirm-auth" onclick="authorizeTerminal()" class="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-indigo-700 transition-shadow flex justify-center items-center">Confirmar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pantalla Principal de Fitxatge -->
+        <div id="main-screen" class="hidden grid lg:grid-cols-12 gap-8">
+            <section class="lg:col-span-8 bg-white rounded-3xl p-8 shadow-sm border border-slate-200">
+                <div class="max-w-2xl mx-auto">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                            <i data-lucide="id-card" class="text-indigo-600"></i> Identificació de la persona
+                        </h3>
+                        <button onclick="openRecoverModal()" class="text-xs text-slate-400 hover:text-indigo-600 font-bold flex items-center gap-1 transition-colors">
+                            <i data-lucide="help-circle" class="w-4 h-4"></i> Oblidada?
+                        </button>
+                    </div>
+                    <div class="space-y-4 mb-8">
+                        <div class="relative">
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1 tracking-wider">Número NIU</label>
+                            <input type="text" id="input-niu" placeholder="Polsa per escriure" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, ''); checkRecommendedAction();" class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-400 focus:bg-white outline-none font-mono transition-all">
+                        </div>
+                        <div class="relative">
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1 tracking-wider">Paraula de pas</label>
+                            <input type="password" id="input-pass" placeholder="••••••••" class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-400 focus:bg-white outline-none font-mono transition-all" onkeydown="if(event.key === 'Enter') executeRecommendedAction()">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <button id="btn-entrada-main" onclick="handleRegister('ENTRADA')" class="btn-active bg-emerald-600 hover:bg-emerald-700 text-white py-6 rounded-2xl transition-all shadow-lg flex flex-col items-center gap-2 group border-2 border-transparent">
+                            <i data-lucide="log-in" class="w-8 h-8 group-hover:translate-y-[-2px] transition-transform"></i>
+                            <span class="font-bold text-sm uppercase tracking-wide">Entrada</span>
+                        </button>
+                        <button id="btn-sortida-main" onclick="handleRegister('SORTIDA')" class="btn-active bg-rose-600 hover:bg-rose-700 text-white py-6 rounded-2xl transition-all shadow-lg flex flex-col items-center gap-2 group border-2 border-transparent">
+                            <i data-lucide="log-out" class="w-8 h-8 group-hover:translate-y-[-2px] transition-transform"></i>
+                            <span class="font-bold text-sm uppercase tracking-wide">Sortida</span>
+                        </button>
+                    </div>
+                </div>
+                <div id="message-box" class="hidden mt-8 p-5 rounded-2xl text-sm font-semibold flex items-center gap-3 shadow-sm border transition-all">
+                    <i id="message-icon" class="w-5 h-5"></i><span id="message-text"></span>
+                </div>
+            </section>
+
+            <section class="lg:col-span-4 bg-white rounded-3xl p-8 shadow-sm border border-slate-200 flex flex-col">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <i data-lucide="history" class="text-indigo-600"></i> Moviments recents
+                    </h3>
+                    <button onclick="clearHistoryFromScreen()" class="text-xs text-rose-500 font-bold hover:text-rose-700 flex items-center gap-1 transition-colors">
+                        <i data-lucide="trash-2" class="w-3 h-3"></i> Netejar
+                    </button>
+                </div>
+                <div id="user-history" class="space-y-3 flex-grow overflow-y-auto pr-2 custom-scrollbar text-center py-10 text-slate-400 italic text-sm">
+                    Fes un registre per veure l'historial.
+                </div>
+            </section>
+        </div>
+
+        <!-- Dashboard Admin -->
+        <div id="admin-dashboard" class="hidden fixed inset-0 bg-slate-50 z-50 overflow-y-auto">
+            <div class="max-w-7xl mx-auto p-4 md:p-8">
+                <div class="flex items-center justify-between mb-8 flex-wrap gap-4">
+                    <div class="flex items-center gap-4">
+                        <button onclick="closeAdminDashboard()" class="bg-white p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 transition-all shadow-sm">
+                            <i data-lucide="arrow-left" class="w-6 h-6"></i>
+                        </button>
+                        <h2 class="text-2xl font-bold text-slate-800 tracking-tight">Gestió d'Auditoria</h2>
+                    </div>
+                    <div class="flex gap-3 flex-wrap">
+                        <button id="btn-unauthorize" onclick="unauthorizeTerminal()" class="bg-rose-100 text-rose-700 px-4 py-2 rounded-xl font-bold hover:bg-rose-200 flex items-center gap-2 shadow-sm transition-all">
+                            <i data-lucide="laptop" class="w-4 h-4"></i> Revocar Terminal
+                        </button>
+                        <div class="w-px bg-slate-200 mx-2"></div>
+                        <button onclick="openUsersModal()" class="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-xl font-bold hover:bg-indigo-200 flex items-center gap-2 shadow-sm transition-all">
+                            <i data-lucide="users" class="w-4 h-4"></i> Persones
+                        </button>
+                        <button onclick="openEditModal(null)" class="bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-emerald-700 flex items-center gap-2 shadow-sm transition-all">
+                            <i data-lucide="plus" class="w-4 h-4"></i> Afegir Registre
+                        </button>
+                        <button onclick="exportToCSV()" class="bg-slate-700 text-white px-4 py-2 rounded-xl font-bold hover:bg-slate-800 flex items-center gap-2 shadow-sm transition-all">
+                            <i data-lucide="download" class="w-4 h-4"></i> Exportar CSV
+                        </button>
+                        <button onclick="fetchSheetData()" class="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-indigo-700 flex items-center gap-2 shadow-sm transition-all">
+                            <i data-lucide="refresh-cw" id="refresh-icon" class="w-4 h-4"></i> Actualitzar
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mb-8">
+                    <!-- Filtres Ràpids -->
+                    <div class="flex gap-2 mb-4 overflow-x-auto custom-scrollbar pb-2">
+                        <span class="text-xs font-bold text-slate-400 uppercase py-1 mr-2 tracking-widest shrink-0">Filtres ràpids:</span>
+                        <button onclick="setQuickFilter('tot')" class="text-xs font-bold bg-slate-100 hover:bg-indigo-100 hover:text-indigo-700 text-slate-600 px-3 py-1 rounded-full transition-all shrink-0">Tot</button>
+                        <button onclick="setQuickFilter('avui')" class="text-xs font-bold bg-slate-100 hover:bg-indigo-100 hover:text-indigo-700 text-slate-600 px-3 py-1 rounded-full transition-all shrink-0">Avui</button>
+                        <button onclick="setQuickFilter('ahir')" class="text-xs font-bold bg-slate-100 hover:bg-indigo-100 hover:text-indigo-700 text-slate-600 px-3 py-1 rounded-full transition-all shrink-0">Ahir</button>
+                        <button onclick="setQuickFilter('setmana')" class="text-xs font-bold bg-slate-100 hover:bg-indigo-100 hover:text-indigo-700 text-slate-600 px-3 py-1 rounded-full transition-all shrink-0">Aquesta Setmana</button>
+                        <button onclick="setQuickFilter('mes')" class="text-xs font-bold bg-slate-100 hover:bg-indigo-100 hover:text-indigo-700 text-slate-600 px-3 py-1 rounded-full transition-all shrink-0">Aquest Mes</button>
+                    </div>
+                    
+                    <div class="grid md:grid-cols-3 gap-6 items-end">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase mb-2 ml-1 tracking-widest">Persona usuària (NIU)</label>
+                            <select id="filter-niu" onchange="applyFilters()" class="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-mono text-sm focus:border-indigo-400 outline-none transition-all">
+                                <option value="">Totes les persones</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase mb-2 ml-1 tracking-widest">Inici</label>
+                            <input type="date" id="filter-date-start" onchange="applyFilters()" class="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-indigo-400 transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase mb-2 ml-1 tracking-widest">Fi</label>
+                            <input type="date" id="filter-date-end" onchange="applyFilters()" class="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-indigo-400 transition-all">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid lg:grid-cols-12 gap-8">
+                    <div class="lg:col-span-4 space-y-6">
+                        <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+                            <div class="flex justify-between items-center mb-6">
+                                <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                    <i data-lucide="bar-chart-3" class="text-indigo-600"></i> Sumari d'Hores
+                                </h3>
+                                <div class="flex gap-1">
+                                    <button onclick="navigateUser(-1)" class="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 transition-colors" title="Persona anterior">
+                                        <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                                    </button>
+                                    <button onclick="navigateUser(1)" class="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 transition-colors" title="Persona següent">
+                                        <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="hours-summary" class="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                                <p class="text-slate-400 text-center py-10 italic">Sense dades.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="lg:col-span-8 bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                <i data-lucide="list" class="text-indigo-600"></i> Detall de Registres
+                            </h3>
+                            <button id="btn-delete-all-records" onclick="openDeleteAllRecordsModal()" class="hidden bg-rose-100 text-rose-700 px-4 py-2 rounded-xl font-bold hover:bg-rose-200 flex items-center gap-2 text-xs shadow-sm transition-all active:scale-95">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i> Esborrar tots els registres
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead class="border-b border-slate-100 text-[10px] text-slate-400 uppercase font-black tracking-widest">
+                                    <tr>
+                                        <th class="py-4 px-2">Data/Hora</th>
+                                        <th class="py-4 px-2">Identificació</th>
+                                        <th class="py-4 px-2">Tipus / Sessió</th>
+                                        <th class="py-4 px-2 text-center">Accions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="detail-table-body" class="text-sm"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Login Supervisor -->
+        <div id="admin-login-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-[100] p-4">
+            <div class="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in duration-200">
+                <div class="flex items-center gap-4 mb-6">
+                    <div class="bg-indigo-100 p-3 rounded-full text-indigo-600">
+                        <i data-lucide="lock" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-slate-800">Àrea Restringida</h3>
+                        <p class="text-slate-500 text-sm">Només personal supervisor.</p>
+                    </div>
+                </div>
+                <input type="password" id="admin-login-pass" placeholder="Paraula de pas de supervisor" class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-400 outline-none mb-2 transition-all" onkeydown="if(event.key === 'Enter') validateAdminLogin()">
+                <p id="login-error" class="hidden text-rose-600 text-xs font-bold mb-4">La contrasenya és incorrecta</p>
+                <div class="flex gap-3">
+                    <button onclick="closeAdminLogin()" class="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-2xl transition-colors">Enrere</button>
+                    <button onclick="validateAdminLogin()" class="flex-1 bg-indigo-600 text-white py-3 font-bold rounded-2xl hover:bg-indigo-700 shadow-lg shadow-indigo-100 active:scale-95 transition-all">Accedir</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Error Autenticació -->
+        <div id="auth-error-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-[120] p-4">
+            <div class="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl animate-in zoom-in duration-200 text-center">
+                <div class="bg-rose-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i data-lucide="shield-alert" class="text-rose-600 w-8 h-8"></i>
+                </div>
+                <h3 class="text-xl font-bold text-slate-800 mb-2">Accés Denegat</h3>
+                <p class="text-slate-500 text-sm mb-6">La persona usuària no està registrada en el sistema o la paraula de pas és incorrecta.</p>
+                <button onclick="closeAuthErrorModal()" class="w-full bg-slate-800 text-white py-3 font-bold rounded-2xl hover:bg-slate-700 transition-all active:scale-95">D'acord</button>
+            </div>
+        </div>
+
+        <!-- Modal Confirmació Esborrar Tots els Registres -->
+        <div id="delete-all-records-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-[130] p-4">
+            <div class="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in duration-200 text-center">
+                <div class="bg-rose-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i data-lucide="alert-triangle" class="text-rose-600 w-8 h-8"></i>
+                </div>
+                <h3 class="text-xl font-bold text-slate-800 mb-2">Esborrar tots els registres</h3>
+                <p class="text-slate-500 text-sm mb-6">S'esborraran de la base de dades tots els registres vinculats a aquesta persona usuària. Aquesta acció no es pot desfer.</p>
+                <div class="flex gap-3">
+                    <button onclick="closeDeleteAllRecordsModal()" class="flex-1 py-3 text-slate-500 font-bold bg-slate-50 hover:bg-slate-100 rounded-2xl transition-colors">Cancel·lar</button>
+                    <button id="btn-confirm-delete-all" onclick="confirmDeleteAllRecords()" class="flex-1 bg-rose-600 text-white py-3 font-bold rounded-2xl hover:bg-rose-700 transition-all shadow-lg shadow-rose-100 active:scale-95">Esborrar definitivament</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Incidència Fitxatge -->
+        <div id="incident-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-[125] p-4">
+            <div class="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl animate-in zoom-in duration-200 text-center border-4 border-orange-400">
+                <div class="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i data-lucide="alert-circle" class="text-orange-600 w-8 h-8"></i>
+                </div>
+                <h3 class="text-xl font-bold text-slate-800 mb-2">Avís d'Incidència</h3>
+                <p class="text-slate-500 text-sm mb-6">S'ha detectat una anomalia en l'historial (manca un marcatge previ d'entrada o de sortida). Recordeu que cal fitxar a l'inici i al final de la sessió.</p>
+                <button onclick="closeIncidentModal()" class="w-full bg-orange-500 text-white py-3 font-bold rounded-2xl hover:bg-orange-600 transition-all active:scale-95">Ho entenc</button>
+            </div>
+        </div>
+
+        <!-- Modal d'Edició de Registre -->
+        <div id="edit-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-[110] p-4">
+            <div class="bg-white rounded-3xl p-8 w-full max-w-lg shadow-2xl animate-in zoom-in duration-200">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 id="edit-modal-title" class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                        <i data-lucide="edit-3" class="text-indigo-600"></i> Editar Registre
+                    </h3>
+                    <button onclick="closeEditModal()" class="text-slate-400 hover:text-slate-600">
+                        <i data-lucide="x" class="w-6 h-6"></i>
+                    </button>
+                </div>
+                
+                <input type="hidden" id="edit-row-num">
+                
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="col-span-1">
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1 tracking-widest">NIU</label>
+                        <input type="text" id="edit-niu" oninput="this.value = this.value.replace(/[^0-9]/g, '');" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-400 font-mono transition-all">
+                    </div>
+                    <div class="col-span-1">
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1 tracking-widest">Tipus</label>
+                        <select id="edit-tipus" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-400 transition-all">
+                            <option value="ENTRADA">ENTRADA</option>
+                            <option value="SORTIDA">SORTIDA</option>
+                        </select>
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1 tracking-widest text-slate-500">Nom Complet</label>
+                        <input type="text" id="edit-nom" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-400 transition-all">
+                    </div>
+                    <div class="col-span-1">
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">Data (2 dígits)</label>
+                        <input type="date" id="edit-date-picker" class="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-indigo-400 transition-all">
+                    </div>
+                    <div class="col-span-1">
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">Hora</label>
+                        <input type="time" step="1" id="edit-time-picker" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-400 transition-all">
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button id="btn-delete-entry" onclick="deleteEntry()" class="bg-rose-50 text-rose-600 px-4 py-3 font-bold rounded-2xl hover:bg-rose-100 flex items-center gap-2 transition-all">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i> Eliminar
+                    </button>
+                    <div class="flex-grow"></div>
+                    <button onclick="closeEditModal()" class="px-6 py-3 text-slate-500 font-bold rounded-2xl hover:bg-slate-50 transition-colors">Cancel·lar</button>
+                    <button id="btn-save-edit" onclick="saveEdit()" class="bg-indigo-600 text-white px-8 py-3 font-bold rounded-2xl hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all">Desar Canvis</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Gestió Usuaris -->
+        <div id="users-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-[105] p-4">
+            <div class="bg-white rounded-3xl p-8 w-full max-w-4xl shadow-2xl animate-in zoom-in duration-200 max-h-[90vh] flex flex-col">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                        <i data-lucide="users" class="text-indigo-600"></i> Gestió de Persones Usuàries
+                    </h3>
+                    <div class="flex gap-3">
+                        <button onclick="openEditUserModal(null)" class="bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-emerald-700 flex items-center gap-2 text-sm shadow-sm transition-all">
+                            <i data-lucide="plus" class="w-4 h-4"></i> Nova Persona
+                        </button>
+                        <button onclick="closeUsersModal()" class="text-slate-400 hover:text-slate-600 p-2">
+                            <i data-lucide="x" class="w-6 h-6"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="overflow-y-auto custom-scrollbar pr-2 flex-grow">
+                    <table class="w-full text-left">
+                        <thead class="border-b border-slate-100 text-[10px] text-slate-400 uppercase font-black tracking-widest sticky top-0 bg-white">
+                            <tr>
+                                <th class="py-4 px-2">NIU</th>
+                                <th class="py-4 px-2">Nom complet</th>
+                                <th class="py-4 px-2">Paraula de pas</th>
+                                <th class="py-4 px-2">Correu</th>
+                                <th class="py-4 px-2 text-center">Accions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table-body" class="text-sm"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Edició Usuari -->
+        <div id="edit-user-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-[115] p-4">
+            <div class="bg-white rounded-3xl p-8 w-full max-w-lg shadow-2xl animate-in zoom-in duration-200">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 id="edit-user-title" class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                        <i data-lucide="user-cog" class="text-indigo-600"></i> Editar Persona
+                    </h3>
+                    <button onclick="closeEditUserModal()" class="text-slate-400 hover:text-slate-600">
+                        <i data-lucide="x" class="w-6 h-6"></i>
+                    </button>
+                </div>
+                <input type="hidden" id="edit-user-row-num">
+                <div class="space-y-4 mb-6">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1 tracking-widest">NIU</label>
+                        <input type="text" id="edit-user-niu" oninput="this.value = this.value.replace(/[^0-9]/g, '');" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-400 font-mono transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1 tracking-widest">Nom complet</label>
+                        <input type="text" id="edit-user-nom" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-400 transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1 tracking-widest">Paraula de pas</label>
+                        <input type="text" id="edit-user-pass" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-400 font-mono transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1 tracking-widest">Correu electrònic</label>
+                        <input type="email" id="edit-user-email" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-400 transition-all">
+                    </div>
+                </div>
+                <p id="edit-user-error" class="hidden text-rose-600 text-xs font-bold mb-4 bg-rose-50 p-3 rounded-xl border border-rose-100"></p>
+                <div class="flex gap-3">
+                    <button id="btn-delete-user" onclick="deleteUser()" class="bg-rose-50 text-rose-600 px-4 py-3 font-bold rounded-2xl hover:bg-rose-100 flex items-center gap-2 transition-all">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i> Eliminar
+                    </button>
+                    <div class="flex-grow"></div>
+                    <button onclick="closeEditUserModal()" class="px-6 py-3 text-slate-500 font-bold rounded-2xl hover:bg-slate-50 transition-colors">Cancel·lar</button>
+                    <button id="btn-save-user" onclick="saveUser()" class="bg-indigo-600 text-white px-8 py-3 font-bold rounded-2xl hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all">Desar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Autoregistre -->
+        <div id="self-register-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-[140] p-4">
+            <div class="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in duration-200">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                        <i data-lucide="user-plus" class="text-indigo-600"></i> Alta al Sistema
+                    </h3>
+                    <button onclick="closeSelfRegisterModal()" class="text-slate-400 hover:text-slate-600">
+                        <i data-lucide="x" class="w-6 h-6"></i>
+                    </button>
+                </div>
+                <div class="space-y-4 mb-6">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1 tracking-widest">Nom i cognoms</label>
+                        <input type="text" id="reg-nom" placeholder="Escriu el teu nom complet" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-400 transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1 tracking-widest">NIU</label>
+                        <input type="text" id="reg-niu" placeholder="Número d'identificació" oninput="this.value = this.value.replace(/[^0-9]/g, '');" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-400 font-mono transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1 tracking-widest">Paraula de pas</label>
+                        <input type="password" id="reg-pass" placeholder="••••••••" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-400 font-mono transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1 tracking-widest">Correu electrònic</label>
+                        <input type="email" id="reg-email" placeholder="correu@uab.cat" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-400 transition-all">
+                    </div>
+                </div>
+                <p id="reg-error" class="hidden text-rose-600 text-xs font-bold mb-4 bg-rose-50 p-3 rounded-xl border border-rose-100"></p>
+                <div class="flex gap-3">
+                    <button onclick="closeSelfRegisterModal()" class="flex-1 py-3 text-slate-500 font-bold bg-slate-50 hover:bg-slate-100 rounded-2xl transition-colors">Cancel·lar</button>
+                    <button id="btn-submit-register" onclick="submitSelfRegister()" class="flex-1 bg-indigo-600 text-white py-3 font-bold rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95">Registrar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Recuperar Paraula de pas -->
+        <div id="recover-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-[140] p-4">
+            <div class="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl animate-in zoom-in duration-200 text-center">
+                <div class="flex justify-between items-center mb-2">
+                    <div class="w-6"></div>
+                    <div class="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto">
+                        <i data-lucide="mail" class="text-indigo-600 w-8 h-8"></i>
+                    </div>
+                    <button onclick="closeRecoverModal()" class="text-slate-400 hover:text-slate-600 w-6 flex justify-end">
+                        <i data-lucide="x" class="w-6 h-6"></i>
+                    </button>
+                </div>
+                <h3 class="text-xl font-bold text-slate-800 mb-2 mt-4">Recuperar Accés</h3>
+                <p class="text-slate-500 text-sm mb-6">Introduïu el vostre número NIU. Si existiu a la base de dades, rebreu un correu amb les instruccions.</p>
+                <div class="mb-6 text-left">
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1 tracking-widest">NIU</label>
+                    <input type="text" id="recover-niu" oninput="this.value = this.value.replace(/[^0-9]/g, '');" class="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl outline-none focus:border-indigo-400 font-mono transition-all text-center text-lg">
+                </div>
+                <p id="recover-error" class="hidden text-rose-600 text-xs font-bold mb-4 bg-rose-50 p-3 rounded-xl border border-rose-100 text-left"></p>
+                <button id="btn-submit-recover" onclick="submitRecover()" class="w-full bg-indigo-600 text-white py-3 font-bold rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95">Enviar Enllaç</button>
+            </div>
+        </div>
+
+        <footer class="mt-8 text-center space-y-1">
+            <p id="terminal-id-text" class="text-[10px] text-slate-400 uppercase tracking-widest font-bold"></p>
+            <p class="text-xs text-slate-500 font-medium">© 2026 • Creat per Xavier Ribes per a UABMèdia</p>
+        </footer>
+    </div>
+
+    <script>
+        const CONFIG = {
+            scriptURL: "https://script.google.com/macros/s/AKfycbxZF4jOZr1-fpksG0V2dMwhJGYIG-T21b0zxEOPr67qjjvFBXVvx0WQRlyk9gx5FUryhQ/exec",
+            adminPassHash: "1ecd114209a0584719049b0bea1cd348a2b4e9cbddb7aad9bb69396ca7750f9e",
+            terminalTokenKey: "horari_terminal_auth_v3"
+        };
+
+        let localLogs = JSON.parse(localStorage.getItem('horari_local_logs') || '[]');
+        let pendingLogs = JSON.parse(localStorage.getItem('horari_pending_logs') || '[]');
+        let masterData = []; 
+        let filteredDataForExport = [];
+        let historyTimeout = null;
+        let isProcessing = false; 
+        let activeUsersList = []; 
+        let currentDeviceID = ""; 
+
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+
+        function playTone(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            if (type === 'success') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.1);
+                gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+            } else if (type === 'error') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(250, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            }
+        }
+
+        window.onload = async () => {
+            currentDeviceID = await getDeviceFingerprintID();
+            
+            updateClock(); setInterval(updateClock, 1000);
+            
+            // Per defecte bloquegem per assegurar la validació
+            checkAuthorizationStatus();
+
+            window.addEventListener('online', handleNetworkChange);
+            window.addEventListener('offline', handleNetworkChange);
+            handleNetworkChange();
+            if (navigator.onLine && pendingLogs.length > 0) syncPendingLogs();
+
+            if (navigator.onLine) {
+                silentSyncBackground();
+                setInterval(silentSyncBackground, 5 * 60 * 1000); 
+            }
+        };
+
+        // --- SISTEMA DE XARXA I SINCRONITZACIÓ ---
+        function handleNetworkChange() {
+            const banner = document.getElementById('offline-banner');
+            if (!navigator.onLine) {
+                banner.classList.remove('hidden');
+            } else {
+                banner.classList.add('hidden');
+                if (pendingLogs.length > 0) syncPendingLogs();
+            }
+        }
+
+        async function syncPendingLogs() {
+            if (pendingLogs.length === 0 || !navigator.onLine) return;
+            const logsToSync = [...pendingLogs];
+            pendingLogs = [];
+            try { localStorage.setItem('horari_pending_logs', JSON.stringify(pendingLogs)); } catch(e){}
+            
+            for (let entry of logsToSync) {
+                try {
+                    await fetch(CONFIG.scriptURL, { method: "POST", body: JSON.stringify(entry) });
+                } catch (e) {
+                    pendingLogs.push(entry);
+                    try { localStorage.setItem('horari_pending_logs', JSON.stringify(pendingLogs)); } catch(e){}
+                }
+            }
+        }
+
+        async function silentSyncBackground() {
+            try {
+                const [logsRes, usersRes] = await Promise.all([
+                    fetch(`${CONFIG.scriptURL}?action=read&t=${Date.now()}`),
+                    fetch(`${CONFIG.scriptURL}?action=read_users&t=${Date.now()}`)
+                ]);
+                
+                let data = [];
+                let uData = [];
+                try { data = await logsRes.json(); } catch(e){}
+                try { uData = await usersRes.json(); } catch(e){}
+                
+                if (Array.isArray(uData)) {
+                    activeUsersList = uData.map(u => u.niu.toString());
+                }
+
+                if (Array.isArray(data)) {
+                    const userLastAction = {};
+                    const dataChronological = [...data].sort((a,b) => parseDateTime(a.data, a.hora) - parseDateTime(b.data, b.hora));
+                    dataChronological.forEach(row => {
+                        userLastAction[row.niu] = row;
+                    });
+                    try { localStorage.setItem('horari_global_status', JSON.stringify(userLastAction)); } catch(e){}
+                }
+            } catch (e) {}
+        }
+
+        async function getDeviceFingerprintID() {
+            let storedId = '';
+            try { storedId = localStorage.getItem('uab_device_id'); } catch(e){}
+            if (storedId) return storedId;
+
+            let gpuInfo = '';
+            try {
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                if (gl) {
+                    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+                    gpuInfo = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : '';
+                }
+            } catch(e) {}
+            
+            const components = [
+                navigator.platform || '',
+                navigator.hardwareConcurrency || '',
+                screen.width,
+                screen.height,
+                screen.colorDepth,
+                gpuInfo
+            ].join('||');
+            
+            const hash = await sha256(components);
+            const newId = 'T-' + hash.substring(0, 8).toUpperCase();
+            try { localStorage.setItem('uab_device_id', newId); } catch(e){}
+            return newId;
+        }
+
+        function setPersistentAuth() {
+            const key = CONFIG.terminalTokenKey + '_auth';
+            try { localStorage.setItem(key, 'true'); } catch(e){}
+            try {
+                const expires = new Date();
+                expires.setFullYear(expires.getFullYear() + 10);
+                document.cookie = `${key}=true; expires=${expires.toUTCString()}; path=/`;
+            } catch(e){}
+        }
+
+        function getPersistentAuth() {
+            const key = CONFIG.terminalTokenKey + '_auth';
+            try {
+                if (localStorage.getItem(key) === 'true') return true;
+                const match = document.cookie.match(new RegExp('(^| )' + key + '=([^;]+)'));
+                if (match && match[2] === 'true') return true;
+            } catch(e){}
+            return false;
+        }
+
+        function removePersistentAuth() {
+            const key = CONFIG.terminalTokenKey + '_auth';
+            try { localStorage.removeItem(key); } catch(e){}
+            try { document.cookie = `${key}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`; } catch(e){}
+        }
+
+        async function checkAuthorizationStatus() {
+            document.getElementById('terminal-id-text').innerText = `ID DE TERMINAL: ${currentDeviceID}`;
+            
+            if (getPersistentAuth()) {
+                unlockTerminal();
+                return;
+            }
+            
+            document.getElementById('lock-screen-title').innerText = "Verificant Terminal...";
+            try {
+                const response = await fetch(`${CONFIG.scriptURL}?action=check_terminal&terminal_id=${currentDeviceID}&t=${Date.now()}`);
+                const data = await response.json();
+                if (data.authorized) {
+                    setPersistentAuth();
+                    unlockTerminal();
+                } else {
+                    lockTerminal();
+                }
+            } catch (e) {
+                lockTerminal();
+            }
+        }
+
+        function unlockTerminal() {
+            const lock = document.getElementById('lock-screen');
+            const main = document.getElementById('main-screen');
+            main.classList.remove('hidden'); 
+            lock.classList.add('hidden'); 
+            document.getElementById('status-badge').innerHTML = `<span class="text-emerald-600 font-bold flex items-center gap-1"><i data-lucide="shield-check" class="w-4 h-4"></i> Terminal Autoritzat</span>`;
+            lucide.createIcons();
+            const inputNiu = document.getElementById('input-niu');
+            if(inputNiu) inputNiu.focus();
+        }
+
+        function lockTerminal() {
+            const lock = document.getElementById('lock-screen');
+            const main = document.getElementById('main-screen');
+            lock.classList.remove('hidden'); 
+            main.classList.add('hidden'); 
+            document.getElementById('lock-screen-title').innerText = "Terminal No Autoritzat";
+            lucide.createIcons();
+        }
+
+        async function sha256(msg) {
+            const buf = new TextEncoder().encode(msg);
+            const hash = await crypto.subtle.digest('SHA-256', buf);
+            return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        function openAdminLogin() { 
+            document.getElementById('login-error').classList.add('hidden');
+            document.getElementById('admin-login-modal').classList.remove('hidden'); 
+            setTimeout(() => document.getElementById('admin-login-pass').focus(), 100);
+        }
+        
+        function closeAdminLogin() { 
+            document.getElementById('admin-login-modal').classList.add('hidden'); 
+        }
+
+        async function validateAdminLogin() {
+            const inp = document.getElementById('admin-login-pass');
+            const hash = await sha256(inp.value);
+            if (hash === CONFIG.adminPassHash) {
+                closeAdminLogin(); inp.value = '';
+                document.getElementById('admin-dashboard').classList.remove('hidden');
+                lucide.createIcons();
+                if (masterData.length === 0) fetchSheetData();
+            } else {
+                playTone('error');
+                document.getElementById('login-error').classList.remove('hidden');
+                inp.value = '';
+                inp.focus();
+            }
+        }
+
+        async function closeAdminDashboard() { 
+            document.getElementById('admin-dashboard').classList.add('hidden');
+            document.getElementById('input-niu').focus();
+        }
+
+        function toggleAdminForm() { 
+            document.getElementById('auth-error').classList.add('hidden');
+            document.getElementById('admin-form').classList.toggle('hidden'); 
+            if(!document.getElementById('admin-form').classList.contains('hidden')) {
+                setTimeout(() => document.getElementById('admin-pass').focus(), 100);
+            }
+        }
+        
+        async function authorizeTerminal() {
+            const inp = document.getElementById('admin-pass');
+            const btn = document.getElementById('btn-confirm-auth');
+            const h = await sha256(inp.value);
+            
+            if (h === CONFIG.adminPassHash) {
+                const originalHtml = btn.innerHTML;
+                btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>`;
+                btn.disabled = true;
+                lucide.createIcons();
+                
+                try {
+                    await fetch(CONFIG.scriptURL, { 
+                        method: "POST", 
+                        body: JSON.stringify({ action: "authorize_terminal", terminal_id: currentDeviceID, data: new Date().toLocaleString('ca-ES') }) 
+                    });
+                    
+                    setPersistentAuth();
+                    unlockTerminal();
+                    inp.value = '';
+                } catch(e) {
+                    alert("Error connectant amb el servidor per guardar l'autorització.");
+                } finally {
+                    btn.innerHTML = originalHtml;
+                    btn.disabled = false;
+                }
+            } else {
+                playTone('error');
+                document.getElementById('auth-error').classList.remove('hidden');
+                inp.value = '';
+                inp.focus();
+            }
+        }
+
+        async function unauthorizeTerminal() {
+            const btn = document.getElementById('btn-unauthorize');
+            if (!btn.dataset.confirmed) {
+                btn.dataset.confirmed = "true";
+                btn.innerHTML = `<i data-lucide="alert-triangle" class="w-4 h-4"></i> Segur?`;
+                btn.className = "bg-rose-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-rose-700 flex items-center gap-2 shadow-sm transition-all";
+                lucide.createIcons();
+                setTimeout(() => {
+                    btn.dataset.confirmed = "";
+                    btn.innerHTML = `<i data-lucide="laptop" class="w-4 h-4"></i> Revocar Terminal`;
+                    btn.className = "bg-rose-100 text-rose-700 px-4 py-2 rounded-xl font-bold hover:bg-rose-200 flex items-center gap-2 shadow-sm transition-all";
+                    lucide.createIcons();
+                }, 3000);
+                return;
+            }
+            
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Revocant...`;
+            lucide.createIcons();
+
+            try {
+                await fetch(CONFIG.scriptURL, { 
+                    method: "POST", 
+                    body: JSON.stringify({ action: "unauthorize_terminal", terminal_id: currentDeviceID }) 
+                });
+                removePersistentAuth();
+                document.getElementById('admin-pass').value = '';
+                closeAdminDashboard();
+                lockTerminal();
+            } catch(e) {
+                alert("Error al revocar el terminal des del servidor.");
+            } finally {
+                btn.dataset.confirmed = "";
+                btn.innerHTML = `<i data-lucide="laptop" class="w-4 h-4"></i> Revocar Terminal`;
+                btn.className = "bg-rose-100 text-rose-700 px-4 py-2 rounded-xl font-bold hover:bg-rose-200 flex items-center gap-2 shadow-sm transition-all";
+                lucide.createIcons();
+            }
+        }
+
+        // --- RELOTGE I DATES ---
+        function updateClock() {
+            const d = new Date();
+            document.getElementById('current-time').innerText = d.toLocaleTimeString('ca-ES');
+            document.getElementById('current-date').innerText = d.toLocaleDateString('ca-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+        }
+
+        function getFormattedDate(d) {
+            const day = d.getDate().toString().padStart(2, '0');
+            const month = (d.getMonth() + 1).toString().padStart(2, '0');
+            const year = d.getFullYear();
+            return `${day}/${month}/${year}`;
+        }
+
+        function ensureTwoDigitsInDate(dateStr) {
+            if (!dateStr || !dateStr.includes('/')) return dateStr;
+            const p = dateStr.split('/');
+            if (p.length !== 3) return dateStr;
+            return `${p[0].padStart(2, '0')}/${p[1].padStart(2, '0')}/${p[2]}`;
+        }
+
+        function parseDateTime(d, t) { 
+            try {
+                if (!d || !t) return 0;
+                const p = d.split('/'); const h = t.split(':'); 
+                return new Date(parseInt(p[2]), parseInt(p[1])-1, parseInt(p[0]), parseInt(h[0]), parseInt(h[1]), parseInt(h[2] || 0)).getTime(); 
+            } catch(e) { return 0; }
+        }
+
+        function formatRoundedDuration(ms) {
+            if (ms <= 0) return "0h.00m";
+            const totalSeconds = Math.round(ms / 1000);
+            let h = Math.floor(totalSeconds / 3600);
+            let m = Math.floor((totalSeconds % 3600) / 60);
+            const s = totalSeconds % 60;
+            
+            if (s >= 31) m++;
+            if (m >= 60) { h++; m = 0; }
+            
+            return `${h}h.${m.toString().padStart(2, '0')}m`;
+        }
+
+        // --- UX 2: RECONEIXEMENT D'ESTAT ---
+        function checkRecommendedAction() {
+            const niu = document.getElementById('input-niu').value.trim();
+            const btnIn = document.getElementById('btn-entrada-main');
+            const btnOut = document.getElementById('btn-sortida-main');
+            
+            btnIn.classList.remove('ring-4', 'ring-offset-2', 'ring-emerald-400', 'scale-[1.02]');
+            btnOut.classList.remove('ring-4', 'ring-offset-2', 'ring-rose-400', 'scale-[1.02]');
+
+            if (niu.length >= 3) { 
+                let lastType = null;
+                let lastTime = 0;
+
+                let globalStatus = {};
+                try { globalStatus = JSON.parse(localStorage.getItem('horari_global_status') || '{}'); } catch(e){}
+                
+                if (globalStatus[niu]) {
+                    lastType = globalStatus[niu].tipus;
+                    lastTime = parseDateTime(globalStatus[niu].data, globalStatus[niu].hora);
+                }
+
+                const lastLocalLog = localLogs.find(l => l.niu.toString() === niu.toString());
+                if (lastLocalLog) {
+                    const localTime = parseDateTime(lastLocalLog.data, lastLocalLog.hora);
+                    if (localTime >= lastTime) {
+                        lastType = lastLocalLog.tipus;
+                    }
+                }
+
+                if (lastType === 'ENTRADA') {
+                    btnOut.classList.add('ring-4', 'ring-offset-2', 'ring-rose-400', 'scale-[1.02]');
+                } else if (lastType === 'SORTIDA') {
+                    btnIn.classList.add('ring-4', 'ring-offset-2', 'ring-emerald-400', 'scale-[1.02]');
+                } else {
+                    btnIn.classList.add('ring-4', 'ring-offset-2', 'ring-emerald-400', 'scale-[1.02]');
+                }
+            }
+        }
+
+        function executeRecommendedAction() {
+            const niu = document.getElementById('input-niu').value.trim();
+            if (niu.length < 3) return;
+            
+            let lastType = null;
+            let lastTime = 0;
+
+            let globalStatus = {};
+            try { globalStatus = JSON.parse(localStorage.getItem('horari_global_status') || '{}'); } catch(e){}
+            
+            if (globalStatus[niu]) {
+                lastType = globalStatus[niu].tipus;
+                lastTime = parseDateTime(globalStatus[niu].data, globalStatus[niu].hora);
+            }
+
+            const lastLocalLog = localLogs.find(l => l.niu.toString() === niu.toString());
+            if (lastLocalLog) {
+                const localTime = parseDateTime(lastLocalLog.data, lastLocalLog.hora);
+                if (localTime >= lastTime) {
+                    lastType = lastLocalLog.tipus;
+                }
+            }
+
+            if (lastType === 'ENTRADA') {
+                handleRegister('SORTIDA');
+            } else {
+                handleRegister('ENTRADA');
+            }
+        }
+
+        // --- FITXATGES AMB VALIDACIÓ ---
+        function closeAuthErrorModal() {
+            document.getElementById('auth-error-modal').classList.add('hidden');
+            const passField = document.getElementById('input-pass');
+            passField.value = '';
+            passField.focus();
+        }
+
+        function openIncidentModal() {
+            document.getElementById('incident-modal').classList.remove('hidden');
+        }
+
+        function closeIncidentModal() {
+            document.getElementById('incident-modal').classList.add('hidden');
+        }
+
+        function triggerSuccessAnimation() {
+            const overlay = document.getElementById('success-overlay');
+            overlay.classList.remove('hidden');
+            overlay.firstElementChild.classList.remove('animate-fade-out');
+            overlay.firstElementChild.classList.add('animate-pop-in');
+            
+            setTimeout(() => {
+                overlay.firstElementChild.classList.remove('animate-pop-in');
+                overlay.firstElementChild.classList.add('animate-fade-out');
+                setTimeout(() => {
+                    overlay.classList.add('hidden');
+                }, 300); 
+            }, 1200); 
+        }
+
+        async function handleRegister(tipus) {
+            if (isProcessing) return;
+
+            const niuField = document.getElementById('input-niu');
+            const passField = document.getElementById('input-pass');
+            const niu = niuField.value.trim();
+            const pass = passField.value.trim();
+            
+            if (!niu || !pass) {
+                playTone('error');
+                showMessage("Cal indicar el Número NIU i la Paraula de pas.", "error");
+                if (!niu) niuField.focus(); else passField.focus();
+                return;
+            }
+
+            isProcessing = true;
+            passField.value = '';
+            checkRecommendedAction();
+
+            const currentTime = new Date();
+            const entry = { 
+                action: "register",
+                data: getFormattedDate(currentTime), 
+                hora: currentTime.toLocaleTimeString('ca-ES'), 
+                niu: niu, 
+                pass: pass,
+                nom: "", 
+                tipus: tipus, 
+                terminal: currentDeviceID
+            };
+
+            const btn = tipus === 'ENTRADA' ? document.getElementById('btn-entrada-main') : document.getElementById('btn-sortida-main');
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-8 h-8 animate-spin"></i><span class="font-bold text-sm uppercase tracking-wide">Processant...</span>`;
+            lucide.createIcons();
+
+            if (!navigator.onLine) {
+                playTone('success');
+                triggerSuccessAnimation();
+                
+                let hasIncident = false;
+                const lastLogBeforeNew = localLogs.find(l => l.niu.toString() === niu.toString());
+                if (tipus === 'ENTRADA' && lastLogBeforeNew && lastLogBeforeNew.tipus === 'ENTRADA') hasIncident = true;
+                if (tipus === 'SORTIDA' && (!lastLogBeforeNew || lastLogBeforeNew.tipus === 'SORTIDA')) hasIncident = true;
+                
+                entry.nom = "Registre fora de línia";
+                pendingLogs.push(entry);
+                try { localStorage.setItem('horari_pending_logs', JSON.stringify(pendingLogs)); } catch(e){}
+                
+                const tempEntry = {...entry}; delete tempEntry.pass;
+                localLogs.unshift(tempEntry);
+                try { localStorage.setItem('horari_local_logs', JSON.stringify(localLogs)); } catch(e){}
+                renderUserHistory(niu);
+                
+                showMessage(`Fitxatge guardat en local (Sense connexió). S'enviarà en breu.`, "success");
+                
+                if (historyTimeout) clearTimeout(historyTimeout);
+                historyTimeout = setTimeout(clearHistoryFromScreen, 15000);
+                
+                niuField.value = '';
+                checkRecommendedAction(); 
+                niuField.focus();
+
+                btn.innerHTML = originalHtml;
+                lucide.createIcons();
+                isProcessing = false;
+                
+                if (hasIncident) openIncidentModal();
+                return;
+            }
+
+            try {
+                const response = await fetch(CONFIG.scriptURL, { 
+                    method: "POST", 
+                    body: JSON.stringify(entry) 
+                });
+                
+                const result = await response.json();
+                
+                if (!result.success) {
+                    playTone('error');
+                    document.getElementById('auth-error-modal').classList.remove('hidden');
+                    niuField.focus();
+                    return; 
+                }
+
+                playTone('success');
+                triggerSuccessAnimation();
+
+                delete entry.pass;
+                entry.nom = result.nom; 
+
+                renderUserHistoryFromServer(result.history);
+                
+                localLogs = JSON.parse(localStorage.getItem('horari_local_logs') || '[]');
+                localLogs.unshift(entry);
+                if (localLogs.length > 200) localLogs = localLogs.slice(0, 200);
+                try { localStorage.setItem('horari_local_logs', JSON.stringify(localLogs)); } catch(e){}
+
+                if (result.history && result.history.length > 0) {
+                    let globalStatus = {};
+                    try { globalStatus = JSON.parse(localStorage.getItem('horari_global_status') || '{}'); } catch(e){}
+                    globalStatus[niu] = result.history[0];
+                    try { localStorage.setItem('horari_global_status', JSON.stringify(globalStatus)); } catch(e){}
+                }
+
+                let hasIncident = false;
+                if (result.history && result.history.length > 1) {
+                    const current = result.history[0]; 
+                    const prev = result.history[1];    
+                    
+                    if (current.tipus === 'ENTRADA' && prev.tipus === 'ENTRADA') hasIncident = true;
+                    if (current.tipus === 'SORTIDA' && prev.tipus === 'SORTIDA') hasIncident = true;
+                } else if (result.history && result.history.length === 1 && tipus === 'SORTIDA') {
+                    hasIncident = true;
+                }
+
+                let durationMsg = "";
+                if (tipus === 'SORTIDA' && result.history && result.history.length > 1) {
+                    const lastEntrance = result.history.find(r => r.tipus === 'ENTRADA');
+                    if (lastEntrance && !hasIncident) {
+                        const startTime = parseDateTime(lastEntrance.data, lastEntrance.hora);
+                        const diff = currentTime.getTime() - startTime;
+                        if (diff > 0) durationMsg = ` Sessió: ${formatRoundedDuration(diff)}`;
+                    }
+                }
+
+                if (historyTimeout) clearTimeout(historyTimeout);
+                historyTimeout = setTimeout(clearHistoryFromScreen, 15000);
+                
+                showMessage(`Fet! ${tipus} correcte per a ${result.nom}.${durationMsg}`, "success");
+                
+                niuField.value = '';
+                checkRecommendedAction(); 
+                niuField.focus();
+
+                if (hasIncident) openIncidentModal();
+                
+            } catch (err) { 
+                playTone('error');
+                showMessage("Error de connexió al servidor o d'escriptura.", "error"); 
+                niuField.focus();
+            } finally {
+                btn.innerHTML = originalHtml;
+                lucide.createIcons();
+                isProcessing = false;
+            }
+        }
+
+        function showMessage(text, type) {
+            const box = document.getElementById('message-box');
+            box.className = `mt-8 p-5 rounded-2xl text-sm font-semibold flex items-center gap-3 animate-in fade-in slide-in-from-top-2 ${type === 'error' ? 'bg-rose-50 text-rose-700 border-rose-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`;
+            document.getElementById('message-text').innerText = text;
+            box.classList.remove('hidden');
+            
+            if (window.messageTimeout) clearTimeout(window.messageTimeout);
+            window.messageTimeout = setTimeout(() => {
+                box.classList.add('hidden');
+            }, 10000); 
+        }
+
+        function renderUserHistory(niu) {
+            const container = document.getElementById('user-history');
+            const logs = localLogs.filter(l => l.niu.toString() === niu.toString()).slice(0, 4);
+            container.innerHTML = logs.map(l => `
+                <div class="p-4 bg-slate-50 rounded-2xl border flex items-center gap-3 shadow-sm">
+                    <div class="w-2 h-10 rounded-full ${l.tipus === 'ENTRADA' ? 'bg-emerald-500' : 'bg-rose-500'}"></div>
+                    <div class="text-left flex-grow">
+                        <p class="font-black text-[11px] uppercase tracking-tighter text-slate-800">${l.tipus} • ${l.hora}</p>
+                        <p class="text-[10px] text-slate-400 font-medium">${ensureTwoDigitsInDate(l.data)}</p>
+                    </div>
+                </div>
+            `).join('') || "No hi ha moviments recents per aquesta persona usuària en la sessió actual.";
+            lucide.createIcons();
+        }
+
+        function renderUserHistoryFromServer(historyArray) {
+            const container = document.getElementById('user-history');
+            if (!historyArray || historyArray.length === 0) {
+                container.innerHTML = "No hi ha moviments recents previs registrats.";
+                return;
+            }
+            container.innerHTML = historyArray.slice(0, 4).map(l => `
+                <div class="p-4 bg-slate-50 rounded-2xl border flex items-center gap-3 shadow-sm">
+                    <div class="w-2 h-10 rounded-full ${l.tipus === 'ENTRADA' ? 'bg-emerald-500' : 'bg-rose-500'}"></div>
+                    <div class="text-left flex-grow">
+                        <p class="font-black text-[11px] uppercase tracking-tighter text-slate-800">${l.tipus} • ${l.hora}</p>
+                        <p class="text-[10px] text-slate-400 font-medium">${ensureTwoDigitsInDate(l.data)}</p>
+                    </div>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function clearHistoryFromScreen() { 
+            if (historyTimeout) clearTimeout(historyTimeout);
+            document.getElementById('user-history').innerHTML = "Fes un registre per veure l'historial d'aquest terminal."; 
+            document.getElementById('input-niu').value = '';
+            document.getElementById('input-pass').value = '';
+            checkRecommendedAction();
+            document.getElementById('input-niu').focus();
+        }
+
+        // --- ADMIN / DASHBOARD ---
+        async function fetchSheetData() {
+            const icon = document.getElementById('refresh-icon'); icon.classList.add('animate-spin');
+            const niuSelect = document.getElementById('filter-niu');
+            const currentNiu = niuSelect.value; 
+
+            try {
+                const [logsRes, usersRes] = await Promise.all([
+                    fetch(`${CONFIG.scriptURL}?action=read&t=${Date.now()}`),
+                    fetch(`${CONFIG.scriptURL}?action=read_users&t=${Date.now()}`)
+                ]);
+                
+                let d = [];
+                let uData = [];
+                
+                try { d = await logsRes.json(); } catch(e) {}
+                try { uData = await usersRes.json(); } catch(e) {}
+                
+                activeUsersList = Array.isArray(uData) ? uData.map(u => u.niu.toString()) : [];
+                masterData = Array.isArray(d) ? d.map(item => ({...item, data: ensureTwoDigitsInDate(item.data)})) : [];
+                
+                const userLastAction = {};
+                const dataChronological = [...masterData].sort((a,b) => parseDateTime(a.data, a.hora) - parseDateTime(b.data, b.hora));
+                dataChronological.forEach(row => {
+                    userLastAction[row.niu] = row;
+                });
+                try { localStorage.setItem('horari_global_status', JSON.stringify(userLastAction)); } catch(e){}
+
+                const nius = [...new Set(masterData.map(i => i.niu).filter(n => n))].sort();
+                niuSelect.innerHTML = '<option value="">Totes les persones</option>' + nius.map(n => `<option value="${n}">${n}</option>`).join('');
+                
+                if (currentNiu && nius.includes(currentNiu)) {
+                    niuSelect.value = currentNiu;
+                }
+                
+                applyFilters();
+            } catch (e) { 
+                console.error("Error carregant dades:", e); 
+            } finally { 
+                icon.classList.remove('animate-spin'); 
+            }
+        }
+
+        function setQuickFilter(type) {
+            const start = document.getElementById('filter-date-start');
+            const end = document.getElementById('filter-date-end');
+            const today = new Date();
+            
+            const pad = (n) => n.toString().padStart(2, '0');
+            
+            if (type === 'tot') {
+                start.value = ''; 
+                end.value = '';
+            }
+            else if (type === 'avui') {
+                const d = `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
+                start.value = d; end.value = d;
+            } 
+            else if (type === 'ahir') {
+                const d = new Date(today); d.setDate(d.getDate() - 1);
+                const ds = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+                start.value = ds; end.value = ds;
+            } 
+            else if (type === 'setmana') {
+                const first = new Date(today);
+                const dia = first.getDay() || 7; 
+                if(dia !== 1) first.setHours(-24 * (dia - 1));
+                
+                start.value = `${first.getFullYear()}-${pad(first.getMonth()+1)}-${pad(first.getDate())}`;
+                end.value = `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
+            } 
+            else if (type === 'mes') {
+                const first = new Date(today.getFullYear(), today.getMonth(), 1);
+                start.value = `${first.getFullYear()}-${pad(first.getMonth()+1)}-${pad(first.getDate())}`;
+                end.value = `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
+            }
+            applyFilters();
+        }
+
+        function applyFilters() {
+            const niu = document.getElementById('filter-niu').value;
+            const startVal = document.getElementById('filter-date-start').value;
+            const endVal = document.getElementById('filter-date-end').value;
+
+            let start = null; if (startVal) { const [y, m, d] = startVal.split('-'); start = new Date(parseInt(y), parseInt(m)-1, parseInt(d)).getTime(); }
+            let end = null; if (endVal) { const [y, m, d] = endVal.split('-'); end = new Date(parseInt(y), parseInt(m)-1, parseInt(d), 23, 59, 59).getTime(); }
+
+            const filtered = masterData.filter(row => {
+                const d = parseDateTime(row.data, row.hora);
+                const niuMatch = (!niu || row.niu.toString() === niu);
+                const dateMatch = (!start || d >= start) && (!end || d <= end);
+                return niuMatch && dateMatch;
+            });
+
+            filteredDataForExport = filtered;
+            renderTable(filtered); 
+            renderSummary(filtered); 
+
+            const btnDeleteAll = document.getElementById('btn-delete-all-records');
+            if (niu && activeUsersList.length > 0 && !activeUsersList.includes(niu.toString())) {
+                btnDeleteAll.classList.remove('hidden');
+            } else {
+                btnDeleteAll.classList.add('hidden');
+            }
+
+            lucide.createIcons();
+        }
+
+        function openDeleteAllRecordsModal() {
+            document.getElementById('delete-all-records-modal').classList.remove('hidden');
+        }
+
+        function closeDeleteAllRecordsModal() {
+            document.getElementById('delete-all-records-modal').classList.add('hidden');
+        }
+
+        async function confirmDeleteAllRecords() {
+            const niu = document.getElementById('filter-niu').value;
+            if(!niu) return;
+
+            const btn = document.getElementById('btn-confirm-delete-all');
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto"></i>`;
+            lucide.createIcons();
+
+            try {
+                const response = await fetch(CONFIG.scriptURL, { 
+                    method: "POST", 
+                    body: JSON.stringify({ action: "delete_all_user_records", niu: niu }) 
+                });
+                let d;
+                try { d = await response.json(); } catch(e) { throw new Error("La resposta no és JSON"); }
+                
+                if (d.error) throw new Error(d.error);
+                
+                await new Promise(r => setTimeout(r, 1000));
+                closeDeleteAllRecordsModal();
+                
+                document.getElementById('filter-niu').value = '';
+                await fetchSheetData(); 
+            } catch (e) {
+                console.error("Error eliminant registres:", e);
+                alert("S'ha produït un error en esborrar els registres.");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        }
+
+        function selectNiuFilter(niu) {
+            const niuSelect = document.getElementById('filter-niu');
+            niuSelect.value = niu;
+            applyFilters();
+        }
+
+        function navigateUser(direction) {
+            const select = document.getElementById('filter-niu');
+            const total = select.options.length;
+            
+            // Si només hi ha l'opció "Totes les persones", no fem res
+            if (total <= 1) return;
+
+            let currentIndex = select.selectedIndex;
+            let newIndex = currentIndex + direction;
+            
+            // Lògica de bucle per saltar-nos "Totes les persones" (índex 0)
+            if (newIndex < 1) newIndex = total - 1; 
+            if (newIndex >= total) newIndex = 1; 
+            
+            select.selectedIndex = newIndex;
+            applyFilters();
+        }
+
+        function renderTable(data) {
+            const dataChronological = [...data].sort((a,b) => parseDateTime(a.data, a.hora) - parseDateTime(b.data, b.hora));
+            
+            const userLastIn = {};
+            dataChronological.forEach(row => {
+                row.isPaired = false; 
+                row.isIncident = false; 
+                
+                if (row.tipus === 'ENTRADA') {
+                    if (userLastIn[row.niu]) {
+                        userLastIn[row.niu].isIncident = true; 
+                    }
+                    userLastIn[row.niu] = row;
+                    row.durationText = null;
+                } else if (row.tipus === 'SORTIDA') {
+                    if (userLastIn[row.niu]) {
+                        const diff = parseDateTime(row.data, row.hora) - parseDateTime(userLastIn[row.niu].data, userLastIn[row.niu].hora);
+                        if (diff > 0) {
+                            row.durationText = formatRoundedDuration(diff);
+                            row.isPaired = true; 
+                            userLastIn[row.niu].isPaired = true; 
+                        }
+                        delete userLastIn[row.niu];
+                    } else {
+                        row.durationText = null;
+                        row.isIncident = true; 
+                    }
+                }
+            });
+
+            document.getElementById('detail-table-body').innerHTML = dataChronological.map(row => {
+                const isOpenSession = !row.isPaired && !row.isIncident && row.tipus === 'ENTRADA';
+                const rowClass = row.isIncident ? 'bg-orange-50 hover:bg-orange-100 border-l-4 border-l-orange-400' : 'hover:bg-slate-50';
+
+                return `<tr class="border-b transition-colors ${rowClass}">
+                    <td class="py-4 px-2">
+                        <p class="font-bold text-slate-700 uppercase">${ensureTwoDigitsInDate(row.data)}</p>
+                        <p class="text-[10px] text-slate-400 font-mono">${row.hora}</p>
+                    </td>
+                    <td class="py-4 px-2">
+                        <p class="text-[11px] font-black text-slate-400 tracking-tighter">NIU ${row.niu}</p>
+                        <p class="text-sm font-semibold text-slate-800">${row.nom || 'S/N'}</p>
+                    </td>
+                    <td class="py-4 px-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] font-black px-3 py-1 rounded-full ${row.tipus === 'ENTRADA' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
+                                ${row.tipus}
+                            </span>
+                            ${row.durationText ? `
+                                <span class="text-[10px] font-bold text-indigo-600 flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100">
+                                    <i data-lucide="timer" class="w-3 h-3"></i> Sessió: ${row.durationText}
+                                </span>
+                            ` : (row.isIncident ? `
+                                <span class="text-[10px] font-bold text-orange-600 flex items-center gap-1 bg-orange-100 px-2 py-1 rounded-lg border border-orange-200" title="Registre desaparellat">
+                                    <i data-lucide="alert-circle" class="w-3 h-3"></i> Incidència
+                                </span>
+                            ` : (isOpenSession ? `
+                                <span class="text-[10px] font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200" title="Pendent de tancament">
+                                    <i data-lucide="activity" class="w-3 h-3"></i> Activa
+                                </span>
+                            ` : ''))}
+                        </div>
+                    </td>
+                    <td class="py-4 px-2 text-center">
+                        <button onclick='openEditModal(${JSON.stringify(row).replace(/'/g, "&apos;")})' class="bg-indigo-50 text-indigo-600 p-2 rounded-lg hover:bg-indigo-600 hover:text-white transition-all shadow-sm">
+                            <i data-lucide="pencil" class="w-4 h-4"></i>
+                        </button>
+                    </td>
+                </tr>`;
+            }).join('') || '<tr><td colspan="4" class="py-10 text-center text-slate-400 italic">No hi ha registres.</td></tr>';
+            lucide.createIcons();
+        }
+
+        function openEditModal(row) {
+            const title = document.getElementById('edit-modal-title');
+            const delBtn = document.getElementById('btn-delete-entry');
+            const saveBtn = document.getElementById('btn-save-edit');
+            
+            if (row) {
+                title.innerHTML = `<i data-lucide="edit-3" class="text-indigo-600"></i> Editar Registre`;
+                document.getElementById('edit-row-num').value = row.rowNum;
+                document.getElementById('edit-niu').value = row.niu;
+                document.getElementById('edit-nom').value = row.nom;
+                document.getElementById('edit-tipus').value = row.tipus;
+                
+                const [d, m, y] = row.data.split('/');
+                document.getElementById('edit-date-picker').value = `${y}-${m.toString().padStart(2,'0')}-${d.toString().padStart(2,'0')}`;
+                const hparts = row.hora.split(':');
+                document.getElementById('edit-time-picker').value = `${hparts[0].padStart(2,'0')}:${hparts[1].padStart(2,'0')}:${(hparts[2] || '00').padStart(2,'0')}`;
+                
+                delBtn.classList.remove('hidden');
+                saveBtn.innerText = "Desar Canvis";
+            } else {
+                title.innerHTML = `<i data-lucide="plus-circle" class="text-emerald-600"></i> Afegir Registre Manual`;
+                document.getElementById('edit-row-num').value = "";
+                document.getElementById('edit-niu').value = "";
+                document.getElementById('edit-nom').value = "";
+                document.getElementById('edit-tipus').value = "ENTRADA";
+                document.getElementById('edit-date-picker').value = new Date().toISOString().split('T')[0];
+                document.getElementById('edit-time-picker').value = "09:00:00";
+                
+                delBtn.classList.add('hidden');
+                saveBtn.innerText = "Crear Registre";
+            }
+            
+            delBtn.dataset.confirmed = "";
+            delBtn.disabled = false;
+            delBtn.innerHTML = `<i data-lucide="trash-2" class="w-4 h-4"></i> Eliminar`;
+            document.getElementById('edit-modal').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function closeEditModal() { document.getElementById('edit-modal').classList.add('hidden'); }
+
+        async function saveEdit() {
+            const rowNum = document.getElementById('edit-row-num').value;
+            const niu = document.getElementById('edit-niu').value;
+            const dateVal = document.getElementById('edit-date-picker').value;
+            const timeVal = document.getElementById('edit-time-picker').value;
+            
+            if(!dateVal || !timeVal || !niu) {
+                alert("NIU, Data i Hora són obligatoris."); return;
+            }
+
+            const [y, m, d] = dateVal.split('-');
+            const formattedDate = `${d.padStart(2,'0')}/${m.padStart(2,'0')}/${y}`;
+            const formattedTime = timeVal.split(':').length === 2 ? `${timeVal}:00` : timeVal;
+
+            const data = {
+                action: rowNum ? "update" : "create",
+                rowNum: rowNum,
+                niu: niu,
+                nom: document.getElementById('edit-nom').value,
+                data: formattedDate,
+                hora: formattedTime,
+                tipus: document.getElementById('edit-tipus').value
+            };
+
+            const btn = document.getElementById('btn-save-edit');
+            btn.disabled = true; btn.innerText = "Processant...";
+
+            try {
+                const response = await fetch(CONFIG.scriptURL, { method: "POST", body: JSON.stringify(data) });
+                let d;
+                try { d = await response.json(); } catch(e) { throw new Error("La resposta no és JSON"); }
+                
+                if (d.error) throw new Error(d.error);
+                
+                await new Promise(r => setTimeout(r, 1200));
+                closeEditModal(); 
+                await fetchSheetData(); 
+            } catch (e) { 
+                console.error("Error desar", e);
+                alert("S'ha produït un error al desar.");
+            } finally { 
+                btn.disabled = false; btn.innerText = "Desar Canvis"; 
+            }
+        }
+
+        async function deleteEntry() {
+            const btn = document.getElementById('btn-delete-entry');
+            if (!btn.dataset.confirmed) {
+                btn.dataset.confirmed = "true";
+                btn.innerHTML = `<i data-lucide="alert-triangle" class="w-4 h-4"></i> Segur?`;
+                btn.className = "bg-rose-600 text-white px-4 py-3 font-bold rounded-2xl flex items-center gap-2 transition-all shadow-lg";
+                lucide.createIcons();
+                setTimeout(() => {
+                    btn.dataset.confirmed = ""; btn.innerHTML = `<i data-lucide="trash-2" class="w-4 h-4"></i> Eliminar`;
+                    btn.className = "bg-rose-50 text-rose-600 px-4 py-3 font-bold rounded-2xl flex items-center gap-2 transition-all";
+                    lucide.createIcons();
+                }, 3000);
+                return;
+            }
+
+            btn.disabled = true; btn.innerText = "Eliminant...";
+            try {
+                const data = { action: "delete", rowNum: document.getElementById('edit-row-num').value };
+                const response = await fetch(CONFIG.scriptURL, { method: "POST", body: JSON.stringify(data) });
+                let d;
+                try { d = await response.json(); } catch(e) { throw new Error("La resposta no és JSON"); }
+                
+                if (d.error) throw new Error(d.error);
+
+                await new Promise(r => setTimeout(r, 1200));
+                closeEditModal(); 
+                await fetchSheetData(); 
+            } catch (e) { 
+                console.error("Error eliminar", e);
+                alert("S'ha produït un error al eliminar.");
+            } finally {
+                btn.disabled = false;
+                btn.className = "bg-rose-50 text-rose-600 px-4 py-3 font-bold rounded-2xl flex items-center gap-2 transition-all";
+            }
+        }
+
+        function renderSummary(data) {
+            const users = {};
+            data.forEach(r => { if (!users[r.niu]) users[r.niu] = { nom: r.nom || 'S/N', logs: [] }; users[r.niu].logs.push(r); });
+            document.getElementById('hours-summary').innerHTML = Object.keys(users).map(niu => {
+                const u = users[niu];
+                const sorted = [...u.logs].sort((a,b) => parseDateTime(a.data, a.hora) - parseDateTime(b.data, b.hora));
+                
+                let ms = 0, lastIn = null, hasIncidencia = false;
+                sorted.forEach(l => {
+                    if (l.tipus === 'ENTRADA') {
+                        if (lastIn !== null) hasIncidencia = true; 
+                        lastIn = parseDateTime(l.data, l.hora);
+                    } else if (l.tipus === 'SORTIDA') {
+                        if (lastIn !== null) { 
+                            ms += (parseDateTime(l.data, l.hora) - lastIn); 
+                            lastIn = null; 
+                        } else {
+                            hasIncidencia = true; 
+                        }
+                    }
+                });
+                
+                const isDeleted = !activeUsersList.includes(niu.toString());
+                const isOrange = isDeleted || hasIncidencia;
+                const bgClass = isOrange ? 'bg-orange-50 border-orange-300 hover:bg-orange-100' : 'bg-slate-50 border-slate-100 hover:bg-slate-100 hover:border-indigo-300';
+                const textNiuClass = isOrange ? 'text-orange-500' : 'text-slate-400';
+                const textNomClass = isOrange ? 'text-orange-800' : 'text-slate-700';
+                
+                let tagsHtml = '';
+                if (isDeleted) tagsHtml += `<span class="ml-2 text-[9px] font-bold bg-orange-200 text-orange-700 px-2 py-0.5 rounded-full tracking-wide">BAIXA</span>`;
+                if (hasIncidencia) tagsHtml += `<span class="ml-2 text-[9px] font-bold bg-orange-200 text-orange-700 px-2 py-0.5 rounded-full tracking-wide inline-flex items-center gap-1"><i data-lucide="alert-circle" class="w-3 h-3"></i> INCIDÈNCIA</span>`;
+                
+                return `<div onclick="selectNiuFilter('${niu}')" class="${bgClass} p-5 rounded-2xl border flex justify-between items-center shadow-sm cursor-pointer transition-all active:scale-95 group">
+                    <div class="text-left">
+                        <p class="text-xs font-mono ${textNiuClass} tracking-tighter group-hover:text-indigo-500 flex items-center flex-wrap gap-1">
+                            ${niu} <span class="text-indigo-400 font-bold ml-1">(${u.logs.length} m.)</span>
+                            ${tagsHtml}
+                        </p>
+                        <p class="font-bold text-sm ${textNomClass} mt-0.5">${u.nom}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-2xl font-black text-indigo-600">${formatRoundedDuration(ms)}</p>
+                    </div>
+                </div>`;
+            }).join('') || '<p class="text-center py-10 text-slate-400 italic">Sense moviments filtrats.</p>';
+        }
+
+        function exportToCSV() {
+            if (filteredDataForExport.length === 0) return;
+            const headers = "Data,Hora,NIU,Nom,Tipus,Terminal\n";
+            const csvRows = filteredDataForExport.map(r => `${ensureTwoDigitsInDate(r.data)},${r.hora},${r.niu},"${r.nom}",${r.tipus},${r.terminal}`);
+            const blob = new Blob([headers + csvRows.join("\n")], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute("download", `registre_horari.csv`);
+            link.click();
+        }
+
+        // --- GESTIÓ DE PERSONES (PESTANYA ID) ---
+        async function fetchUsersData() {
+            try {
+                const r = await fetch(`${CONFIG.scriptURL}?action=read_users&t=${Date.now()}`);
+                let d = [];
+                try { d = await r.json(); } catch(e) { throw new Error("La resposta no és JSON"); }
+                
+                if (d.error) throw new Error(d.error);
+                
+                activeUsersList = Array.isArray(d) ? d.map(u => u.niu.toString()) : [];
+                renderUsersTable(d);
+                applyFilters(); 
+            } catch (e) { console.error("Error carregant persones usuàries:", e); }
+        }
+        
+        function renderUsersTable(data) {
+            if (!Array.isArray(data)) return;
+            document.getElementById('users-table-body').innerHTML = data.map(row => `
+                <tr class="border-b hover:bg-slate-50 transition-colors">
+                    <td class="py-4 px-2 font-mono text-slate-600 font-bold">${row.niu}</td>
+                    <td class="py-4 px-2 font-semibold text-slate-800">${row.nom}</td>
+                    <td class="py-4 px-2 font-mono text-slate-400 text-xs">${row.pass}</td>
+                    <td class="py-4 px-2 text-slate-500 text-xs">${row.email || ''}</td>
+                    <td class="py-4 px-2 text-center">
+                        <button onclick='openEditUserModal(${JSON.stringify(row).replace(/'/g, "&apos;")})' class="bg-indigo-50 text-indigo-600 p-2 rounded-lg hover:bg-indigo-600 hover:text-white transition-all shadow-sm">
+                            <i data-lucide="pencil" class="w-4 h-4"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('') || '<tr><td colspan="5" class="py-10 text-center text-slate-400 italic">No hi ha persones registrades.</td></tr>';
+            lucide.createIcons();
+        }
+        
+        async function openUsersModal() {
+            document.getElementById('users-modal').classList.remove('hidden');
+            await fetchUsersData();
+        }
+        
+        function closeUsersModal() { document.getElementById('users-modal').classList.add('hidden'); }
+        
+        function openEditUserModal(row) {
+            const title = document.getElementById('edit-user-title');
+            const delBtn = document.getElementById('btn-delete-user');
+            const saveBtn = document.getElementById('btn-save-user');
+            const errorMsg = document.getElementById('edit-user-error');
+            
+            if (errorMsg) {
+                errorMsg.classList.add('hidden');
+                errorMsg.innerText = '';
+            }
+            
+            if (row) {
+                title.innerHTML = `<i data-lucide="user-cog" class="text-indigo-600"></i> Editar Persona`;
+                document.getElementById('edit-user-row-num').value = row.rowNum;
+                document.getElementById('edit-user-niu').value = row.niu;
+                document.getElementById('edit-user-nom').value = row.nom;
+                document.getElementById('edit-user-pass').value = row.pass;
+                const emailEl = document.getElementById('edit-user-email');
+                if (emailEl) emailEl.value = row.email || '';
+                delBtn.classList.remove('hidden');
+                saveBtn.innerText = "Desar Canvis";
+            } else {
+                title.innerHTML = `<i data-lucide="user-plus" class="text-emerald-600"></i> Nova Persona`;
+                document.getElementById('edit-user-row-num').value = "";
+                document.getElementById('edit-user-niu').value = "";
+                document.getElementById('edit-user-nom').value = "";
+                document.getElementById('edit-user-pass').value = "";
+                const emailEl = document.getElementById('edit-user-email');
+                if (emailEl) emailEl.value = "";
+                delBtn.classList.add('hidden');
+                saveBtn.innerText = "Crear Persona";
+            }
+            
+            delBtn.dataset.confirmed = "";
+            delBtn.disabled = false;
+            delBtn.innerHTML = `<i data-lucide="trash-2" class="w-4 h-4"></i> Eliminar`;
+            document.getElementById('edit-user-modal').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function closeEditUserModal() { document.getElementById('edit-user-modal').classList.add('hidden'); }
+
+        async function saveUser() {
+            const rowNum = document.getElementById('edit-user-row-num').value;
+            const niu = document.getElementById('edit-user-niu').value.trim();
+            const nom = document.getElementById('edit-user-nom').value.trim();
+            const pass = document.getElementById('edit-user-pass').value.trim();
+            const emailEl = document.getElementById('edit-user-email');
+            const email = emailEl ? emailEl.value.trim() : '';
+            const errorMsg = document.getElementById('edit-user-error');
+            
+            if (errorMsg) errorMsg.classList.add('hidden');
+            
+            if(!niu || !pass) { 
+                if (errorMsg) {
+                    errorMsg.innerText = "Siusplau, empleneu el NIU i la Paraula de pas com a mínim.";
+                    errorMsg.classList.remove('hidden');
+                } else {
+                    alert("Siusplau, empleneu el NIU i la Paraula de pas com a mínim.");
+                }
+                return; 
+            }
+
+            // Comprovació de duplicats a la interfície d'administració
+            if (!rowNum && activeUsersList.includes(niu.toString())) {
+                if (errorMsg) {
+                    errorMsg.innerHTML = "Atenció: Aquest NIU ja consta com a registrat al sistema. Verifiqueu-ho a la llista.";
+                    errorMsg.classList.remove('hidden');
+                } else {
+                    alert("Atenció: Aquest NIU ja consta com a registrat al sistema. Verifiqueu-ho a la llista.");
+                }
+                return;
+            }
+
+            const data = {
+                action: rowNum ? "update_user" : "create_user",
+                rowNum: rowNum,
+                niu: niu,
+                nom: nom,
+                pass: pass,
+                email: email
+            };
+
+            const btn = document.getElementById('btn-save-user');
+            btn.disabled = true; btn.innerText = "Processant...";
+
+            try {
+                const response = await fetch(CONFIG.scriptURL, { method: "POST", body: JSON.stringify(data) });
+                let d;
+                try { d = await response.json(); } catch(e) { throw new Error("La resposta no és JSON"); }
+                
+                if (d.error) throw new Error(d.error);
+                
+                await new Promise(r => setTimeout(r, 1200));
+                closeEditUserModal(); 
+                await fetchUsersData(); 
+            } catch (e) { 
+                console.error("Error desar usuari", e); 
+                if (errorMsg) {
+                    errorMsg.innerText = "S'ha produït un error al desar les dades.";
+                    errorMsg.classList.remove('hidden');
+                } else {
+                    alert("S'ha produït un error al desar les dades.");
+                }
+            } finally { 
+                btn.disabled = false; btn.innerText = "Desar"; 
+            }
+        }
+
+        async function deleteUser() {
+            const btn = document.getElementById('btn-delete-user');
+            if (!btn.dataset.confirmed) {
+                btn.dataset.confirmed = "true";
+                btn.innerHTML = `<i data-lucide="alert-triangle" class="w-4 h-4"></i> Segur?`;
+                btn.className = "bg-rose-600 text-white px-4 py-3 font-bold rounded-2xl flex items-center gap-2 transition-all shadow-lg";
+                lucide.createIcons();
+                setTimeout(() => {
+                    btn.dataset.confirmed = ""; btn.innerHTML = `<i data-lucide="trash-2" class="w-4 h-4"></i> Eliminar`;
+                    btn.className = "bg-rose-50 text-rose-600 px-4 py-3 font-bold rounded-2xl flex items-center gap-2 transition-all";
+                    lucide.createIcons();
+                }, 3000);
+                return;
+            }
+
+            btn.disabled = true; btn.innerText = "Eliminant...";
+            try {
+                const response = await fetch(CONFIG.scriptURL, { method: "POST", body: JSON.stringify({ action: "delete_user", rowNum: document.getElementById('edit-user-row-num').value })});
+                let d;
+                try { d = await response.json(); } catch(e) { throw new Error("La resposta no és JSON"); }
+                
+                if (d.error) throw new Error(d.error);
+                
+                await new Promise(r => setTimeout(r, 1200));
+                closeEditUserModal(); 
+                await fetchUsersData(); 
+            } catch (e) { 
+                console.error("Error eliminar usuari", e); 
+                alert("S'ha produït un error a l'eliminar la persona usuària.");
+            } finally {
+                btn.disabled = false;
+                btn.className = "bg-rose-50 text-rose-600 px-4 py-3 font-bold rounded-2xl flex items-center gap-2 transition-all";
+            }
+        }
+
+        // --- AUTOREGISTRE I RECUPERACIÓ ---
+        function openSelfRegisterModal() {
+            document.getElementById('reg-nom').value = '';
+            document.getElementById('reg-niu').value = '';
+            document.getElementById('reg-pass').value = '';
+            document.getElementById('reg-email').value = '';
+            document.getElementById('reg-error').classList.add('hidden');
+            document.getElementById('self-register-modal').classList.remove('hidden');
+        }
+
+        function closeSelfRegisterModal() {
+            document.getElementById('self-register-modal').classList.add('hidden');
+        }
+
+        async function submitSelfRegister() {
+            const nom = document.getElementById('reg-nom').value.trim();
+            const niu = document.getElementById('reg-niu').value.trim();
+            const pass = document.getElementById('reg-pass').value.trim();
+            const email = document.getElementById('reg-email').value.trim();
+            const errorMsg = document.getElementById('reg-error');
+            
+            errorMsg.classList.add('hidden');
+
+            if (!nom || !niu || !pass || !email) {
+                errorMsg.innerText = "Tots els camps són obligatoris.";
+                errorMsg.classList.remove('hidden');
+                return;
+            }
+
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                errorMsg.innerText = "Cal introduir una adreça de correu electrònic vàlida.";
+                errorMsg.classList.remove('hidden');
+                return;
+            }
+            
+            // Validació extra: Evitem iniciar el procés si detectem que ja està al sistema
+            if (activeUsersList.length > 0 && activeUsersList.includes(niu.toString())) {
+                errorMsg.innerHTML = "Aquest NIU ja consta registrat. <br>Tanqueu aquesta finestra i feu servir l'opció <strong>Oblidada?</strong> per recuperar l'accés.";
+                errorMsg.classList.remove('hidden');
+                return;
+            }
+
+            const btn = document.getElementById('btn-submit-register');
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto"></i>`;
+            lucide.createIcons();
+
+            try {
+                const response = await fetch(CONFIG.scriptURL, { 
+                    method: "POST", 
+                    body: JSON.stringify({ action: "self_register", niu: niu, nom: nom, pass: pass, email: email }) 
+                });
+                
+                let res;
+                try { 
+                    res = await response.json(); 
+                } catch(e) { 
+                    throw new Error("Resposta invàlida del servidor. Sol estar provocat per un bloqueig de permisos a Google Apps Script."); 
+                }
+                
+                if (!res.success) {
+                    errorMsg.innerHTML = res.error || "S'ha produït un error en el registre.";
+                    errorMsg.classList.remove('hidden');
+                } else {
+                    showMessage("S'ha enviat un correu de verificació. Reviseu la safata d'entrada i feu clic a l'enllaç per completar l'alta al sistema.", "success");
+                    closeSelfRegisterModal();
+                }
+            } catch (e) {
+                errorMsg.innerText = "Error: " + e.message;
+                errorMsg.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+                lucide.createIcons();
+            }
+        }
+
+        function openRecoverModal() {
+            const currentNiu = document.getElementById('input-niu').value;
+            document.getElementById('recover-niu').value = currentNiu;
+            document.getElementById('recover-error').classList.add('hidden');
+            document.getElementById('recover-modal').classList.remove('hidden');
+        }
+
+        function closeRecoverModal() {
+            document.getElementById('recover-modal').classList.add('hidden');
+        }
+
+        async function submitRecover() {
+            const niu = document.getElementById('recover-niu').value.trim();
+            const errorMsg = document.getElementById('recover-error');
+            
+            errorMsg.classList.add('hidden');
+            
+            if (!niu) {
+                errorMsg.innerText = "Cal introduir el NIU obligatòriament.";
+                errorMsg.classList.remove('hidden');
+                return;
+            }
+
+            const btn = document.getElementById('btn-submit-recover');
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto"></i>`;
+            lucide.createIcons();
+
+            try {
+                const response = await fetch(CONFIG.scriptURL, { 
+                    method: "POST", 
+                    body: JSON.stringify({ action: "recover_password", niu: niu }) 
+                });
+                
+                let res;
+                try { 
+                    res = await response.json(); 
+                } catch(e) { 
+                    throw new Error("El servidor ha bloquejat l'enviament. Assegureu-vos d'haver donat permisos a MailApp al vostre projecte de Google."); 
+                }
+                
+                if (!res.success) {
+                    errorMsg.innerText = res.error || "No s'ha pogut processar la petició.";
+                    errorMsg.classList.remove('hidden');
+                } else {
+                    showMessage("S'ha enviat un correu amb les instruccions. Reviseu la safata d'entrada i la de correu brossa (SPAM).", "success");
+                    closeRecoverModal();
+                    document.getElementById('recover-niu').value = '';
+                }
+            } catch (e) {
+                errorMsg.innerText = "Error de connexió: " + e.message;
+                errorMsg.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+                lucide.createIcons();
+            }
+        }
+    </script>
+</body>
+</html>
