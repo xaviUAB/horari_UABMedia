@@ -111,7 +111,7 @@
                         </div>
                         <div class="relative">
                             <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1 tracking-wider">Observacions (Opcional)</label>
-                            <input type="text" id="input-obs" placeholder="Tasques realitzades, incidències..." class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-400 focus:bg-white outline-none transition-all" onkeydown="if(event.key === 'Enter') executeRecommendedAction()">
+                            <textarea id="input-obs" rows="1" placeholder="Tasques realitzades, incidències..." class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-400 focus:bg-white outline-none transition-all custom-scrollbar resize-none overflow-hidden" oninput="this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px';" onkeydown="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); executeRecommendedAction(); }"></textarea>
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-4">
@@ -338,7 +338,7 @@
                     </div>
                     <div class="col-span-2">
                         <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1 tracking-widest text-slate-500">Observacions</label>
-                        <input type="text" id="edit-obs" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-400 transition-all">
+                        <textarea id="edit-obs" rows="1" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-400 transition-all custom-scrollbar resize-none overflow-hidden" oninput="this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px';"></textarea>
                     </div>
                     <div class="col-span-1">
                         <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">Data (2 dígits)</label>
@@ -1104,7 +1104,10 @@
                 showMessage(`Fet! ${tipus} correcte per a ${result.nom}.${durationMsg}`, "success");
                 
                 niuField.value = '';
-                if(obsField) obsField.value = '';
+                if(obsField) {
+                    obsField.value = '';
+                    obsField.style.height = 'auto';
+                }
                 checkRecommendedAction(); 
                 niuField.focus();
 
@@ -1172,15 +1175,21 @@
             document.getElementById('input-niu').value = '';
             document.getElementById('input-pass').value = '';
             const obsField = document.getElementById('input-obs');
-            if(obsField) obsField.value = '';
+            if(obsField) {
+                obsField.value = '';
+                obsField.style.height = 'auto';
+            }
             checkRecommendedAction();
             document.getElementById('input-niu').focus();
         }
 
+        // --- ADMIN / DASHBOARD ---
+
         async function fetchSheetData() {
-            const icon = document.getElementById('refresh-icon'); icon.classList.add('animate-spin');
+            const icon = document.getElementById('refresh-icon');
+            if (icon) icon.classList.add('animate-spin');
             const niuSelect = document.getElementById('filter-niu');
-            const currentNiu = niuSelect.value; 
+            const currentNiu = niuSelect ? niuSelect.value : null;
 
             try {
                 const [logsRes, usersRes] = await Promise.all([
@@ -1204,18 +1213,20 @@
                 });
                 try { localStorage.setItem('horari_global_status', JSON.stringify(userLastAction)); } catch(e){}
 
-                const nius = [...new Set(masterData.map(i => i.niu).filter(n => n))].sort();
-                niuSelect.innerHTML = '<option value="">Totes les persones</option>' + nius.map(n => `<option value="${n}">${n}</option>`).join('');
-                
-                if (currentNiu && nius.includes(currentNiu)) {
-                    niuSelect.value = currentNiu;
+                if (niuSelect) {
+                    const nius = [...new Set(masterData.map(i => i.niu).filter(n => n))].sort();
+                    niuSelect.innerHTML = '<option value="">Totes les persones</option>' + nius.map(n => `<option value="${n}">${n}</option>`).join('');
+                    
+                    if (currentNiu && nius.includes(currentNiu)) {
+                        niuSelect.value = currentNiu;
+                    }
                 }
                 
                 applyFilters();
             } catch (e) { 
                 console.error("Error carregant dades:", e); 
             } finally { 
-                icon.classList.remove('animate-spin'); 
+                if (icon) icon.classList.remove('animate-spin'); 
             }
         }
 
@@ -1410,7 +1421,7 @@
                         ${row.observacions ? `
                             <div class="relative group/obs w-max">
                                 <p class="text-[11px] text-slate-600 font-medium italic truncate max-w-[150px] cursor-help border-b border-dashed border-slate-300 pb-0.5 hover:text-indigo-600 transition-colors">${row.observacions}</p>
-                                <div class="hidden group-hover/obs:block absolute z-[60] bottom-full left-0 mb-2 w-64 bg-slate-800 text-slate-100 text-[11px] leading-relaxed p-3 rounded-2xl shadow-xl whitespace-normal break-words pointer-events-none animate-in fade-in slide-in-from-bottom-1 duration-200">
+                                <div class="hidden group-hover/obs:block absolute z-[60] bottom-full left-0 mb-2 min-w-[200px] w-max max-w-xs md:max-w-md bg-slate-800 text-slate-100 text-[11px] leading-relaxed p-3 rounded-2xl shadow-xl whitespace-pre-wrap break-words pointer-events-none animate-in fade-in slide-in-from-bottom-1 duration-200">
                                     ${row.observacions}
                                     <div class="absolute -bottom-1.5 left-4 w-3 h-3 bg-slate-800 rotate-45 rounded-sm"></div>
                                 </div>
@@ -1443,7 +1454,11 @@
                 document.getElementById('edit-date-picker').value = `${y}-${m.toString().padStart(2,'0')}-${d.toString().padStart(2,'0')}`;
                 const hparts = row.hora.split(':');
                 document.getElementById('edit-time-picker').value = `${hparts[0].padStart(2,'0')}:${hparts[1].padStart(2,'0')}:${(hparts[2] || '00').padStart(2,'0')}`;
-                document.getElementById('edit-obs').value = row.observacions || '';
+                const editObs = document.getElementById('edit-obs');
+                if (editObs) {
+                    editObs.value = row.observacions || '';
+                    setTimeout(() => { editObs.style.height = 'auto'; editObs.style.height = editObs.scrollHeight + 'px'; }, 10);
+                }
                 
                 delBtn.classList.remove('hidden');
                 saveBtn.innerText = "Desar Canvis";
@@ -1455,7 +1470,11 @@
                 document.getElementById('edit-tipus').value = "ENTRADA";
                 document.getElementById('edit-date-picker').value = new Date().toISOString().split('T')[0];
                 document.getElementById('edit-time-picker').value = "09:00:00";
-                document.getElementById('edit-obs').value = "";
+                const editObs = document.getElementById('edit-obs');
+                if (editObs) {
+                    editObs.value = "";
+                    editObs.style.height = 'auto';
+                }
                 
                 delBtn.classList.add('hidden');
                 saveBtn.innerText = "Crear Registre";
