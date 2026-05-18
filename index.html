@@ -15,6 +15,7 @@
         .modal-overlay { background-color: rgba(0,0,0,0.5); }
         .btn-active:active { transform: scale(0.98); }
         
+        /* Animació d'èxit */
         @keyframes popIn {
             0% { transform: scale(0.5); opacity: 0; }
             70% { transform: scale(1.1); opacity: 1; }
@@ -54,7 +55,7 @@
                     <i data-lucide="clock" class="w-8 h-8 group-hover:rotate-12 transition-transform"></i>
                 </div>
                 <div>
-                    <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Registre Horari v6.9</h1>
+                    <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Registre Horari v7.0</h1>
                     <p id="status-badge" class="text-sm font-medium mt-1 flex items-center gap-1"></p>
                 </div>
             </div>
@@ -174,7 +175,6 @@
                 </div>
 
                 <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mb-8">
-                    <!-- Filtres Ràpids -->
                     <div class="flex gap-2 mb-4 overflow-x-auto custom-scrollbar pb-2">
                         <span class="text-xs font-bold text-slate-400 uppercase py-1 mr-2 tracking-widest shrink-0">Filtres ràpids:</span>
                         <button onclick="setQuickFilter('tot')" class="text-xs font-bold bg-slate-100 hover:bg-indigo-100 hover:text-indigo-700 text-slate-600 px-3 py-1 rounded-full transition-all shrink-0">Tot</button>
@@ -239,6 +239,7 @@
                                         <th class="py-4 px-2">Data/Hora</th>
                                         <th class="py-4 px-2">Identificació</th>
                                         <th class="py-4 px-2">Tipus / Sessió</th>
+                                        <th class="py-4 px-2">Observacions</th>
                                         <th class="py-4 px-2 text-center">Accions</th>
                                     </tr>
                                 </thead>
@@ -250,7 +251,6 @@
             </div>
         </div>
 
-        <!-- Modal Login Supervisor -->
         <div id="admin-login-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-[100] p-4">
             <div class="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in duration-200">
                 <div class="flex items-center gap-4 mb-6">
@@ -271,7 +271,6 @@
             </div>
         </div>
 
-        <!-- Modal Error Autenticació -->
         <div id="auth-error-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-[120] p-4">
             <div class="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl animate-in zoom-in duration-200 text-center">
                 <div class="bg-rose-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -283,7 +282,6 @@
             </div>
         </div>
 
-        <!-- Modal Confirmació Esborrar Tots els Registres -->
         <div id="delete-all-records-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-[130] p-4">
             <div class="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in duration-200 text-center">
                 <div class="bg-rose-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -298,7 +296,6 @@
             </div>
         </div>
 
-        <!-- Modal Incidència Fitxatge -->
         <div id="incident-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-[125] p-4">
             <div class="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl animate-in zoom-in duration-200 text-center border-4 border-orange-400">
                 <div class="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -310,7 +307,6 @@
             </div>
         </div>
 
-        <!-- Modal d'Edició de Registre -->
         <div id="edit-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-[110] p-4">
             <div class="bg-white rounded-3xl p-8 w-full max-w-lg shadow-2xl animate-in zoom-in duration-200">
                 <div class="flex justify-between items-center mb-6">
@@ -340,6 +336,10 @@
                         <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1 tracking-widest text-slate-500">Nom Complet</label>
                         <input type="text" id="edit-nom" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-400 transition-all">
                     </div>
+                    <div class="col-span-2">
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1 tracking-widest text-slate-500">Observacions</label>
+                        <input type="text" id="edit-obs" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-400 transition-all">
+                    </div>
                     <div class="col-span-1">
                         <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">Data (2 dígits)</label>
                         <input type="date" id="edit-date-picker" class="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-indigo-400 transition-all">
@@ -361,7 +361,6 @@
             </div>
         </div>
 
-        <!-- Modal Gestió Usuaris -->
         <div id="users-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-[105] p-4">
             <div class="bg-white rounded-3xl p-8 w-full max-w-4xl shadow-2xl animate-in zoom-in duration-200 max-h-[90vh] flex flex-col">
                 <div class="flex justify-between items-center mb-6">
@@ -394,7 +393,6 @@
             </div>
         </div>
 
-        <!-- Modal Edició Usuari -->
         <div id="edit-user-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-[115] p-4">
             <div class="bg-white rounded-3xl p-8 w-full max-w-lg shadow-2xl animate-in zoom-in duration-200">
                 <div class="flex justify-between items-center mb-6">
@@ -436,7 +434,6 @@
             </div>
         </div>
 
-        <!-- Modal Autoregistre -->
         <div id="self-register-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-[140] p-4">
             <div class="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in duration-200">
                 <div class="flex justify-between items-center mb-6">
@@ -473,7 +470,6 @@
             </div>
         </div>
 
-        <!-- Modal Recuperar Paraula de pas -->
         <div id="recover-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-[140] p-4">
             <div class="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl animate-in zoom-in duration-200 text-center">
                 <div class="flex justify-between items-center mb-2">
@@ -549,6 +545,7 @@
 
         window.onload = async () => {
             currentDeviceID = await getDeviceFingerprintID();
+            
             updateClock(); setInterval(updateClock, 1000);
             checkAuthorizationStatus();
 
@@ -831,7 +828,6 @@
             }
         }
 
-        // --- RELOTGE I DATES ---
         function updateClock() {
             const d = new Date();
             document.getElementById('current-time').innerText = d.toLocaleTimeString('ca-ES');
@@ -873,7 +869,6 @@
             return `${h}h.${m.toString().padStart(2, '0')}m`;
         }
 
-        // --- UX 2: RECONEIXEMENT D'ESTAT ---
         function checkRecommendedAction() {
             const niu = document.getElementById('input-niu').value.trim();
             const btnIn = document.getElementById('btn-entrada-main');
@@ -1128,7 +1123,7 @@
 
         function showMessage(text, type) {
             const box = document.getElementById('message-box');
-            box.className = `mt-8 p-5 rounded-2xl text-sm font-semibold flex items-center gap-3 animate-in fade-in slide-in-from-top-2 ${type === 'error' ? 'bg-rose-50 text-rose-700 border-rose-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`;
+            box.className = `mt-8 p-5 rounded-2xl text-sm font-semibold flex items-center gap-3 shadow-sm border transition-all animate-in fade-in slide-in-from-top-2 ${type === 'error' ? 'bg-rose-50 text-rose-700 border-rose-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`;
             document.getElementById('message-text').innerText = text;
             box.classList.remove('hidden');
             
@@ -1196,8 +1191,8 @@
                 let d = [];
                 let uData = [];
                 
-                try { d = await logsRes.json(); } catch(e) {}
-                try { uData = await usersRes.json(); } catch(e) {}
+                try { d = await logsRes.json(); } catch(e){}
+                try { uData = await usersRes.json(); } catch(e){}
                 
                 activeUsersList = Array.isArray(uData) ? uData.map(u => u.niu.toString()) : [];
                 masterData = Array.isArray(d) ? d.map(item => ({...item, data: ensureTwoDigitsInDate(item.data)})) : [];
@@ -1227,15 +1222,11 @@
         function navigateUser(direction) {
             const select = document.getElementById('filter-niu');
             const total = select.options.length;
-            
             if (total <= 1) return;
-
             let currentIndex = select.selectedIndex;
             let newIndex = currentIndex + direction;
-            
             if (newIndex < 1) newIndex = total - 1; 
             if (newIndex >= total) newIndex = 1; 
-            
             select.selectedIndex = newIndex;
             applyFilters();
         }
@@ -1244,7 +1235,6 @@
             const start = document.getElementById('filter-date-start');
             const end = document.getElementById('filter-date-end');
             const today = new Date();
-            
             const pad = (n) => n.toString().padStart(2, '0');
             
             if (type === 'tot') {
@@ -1264,7 +1254,6 @@
                 const first = new Date(today);
                 const dia = first.getDay() || 7; 
                 if(dia !== 1) first.setHours(-24 * (dia - 1));
-                
                 start.value = `${first.getFullYear()}-${pad(first.getMonth()+1)}-${pad(first.getDate())}`;
                 end.value = `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
             } 
@@ -1301,7 +1290,6 @@
             } else {
                 btnDeleteAll.classList.add('hidden');
             }
-
             lucide.createIcons();
         }
 
@@ -1383,7 +1371,9 @@
                 }
             });
 
-            document.getElementById('detail-table-body').innerHTML = dataChronological.map(row => {
+            const finalSorted = [...dataChronological].sort((a,b) => parseDateTime(b.data, b.hora) - parseDateTime(a.data, a.hora));
+
+            document.getElementById('detail-table-body').innerHTML = finalSorted.map(row => {
                 const isOpenSession = !row.isPaired && !row.isIncident && row.tipus === 'ENTRADA';
                 const rowClass = row.isIncident ? 'bg-orange-50 hover:bg-orange-100 border-l-4 border-l-orange-400' : 'hover:bg-slate-50';
 
@@ -1416,13 +1406,16 @@
                             ` : ''))}
                         </div>
                     </td>
+                    <td class="py-4 px-2">
+                        <p class="text-[11px] text-slate-500 italic truncate max-w-[150px]" title="${row.observacions || ''}">${row.observacions || '<span class="text-slate-300">-</span>'}</p>
+                    </td>
                     <td class="py-4 px-2 text-center">
                         <button onclick='openEditModal(${JSON.stringify(row).replace(/'/g, "&apos;")})' class="bg-indigo-50 text-indigo-600 p-2 rounded-lg hover:bg-indigo-600 hover:text-white transition-all shadow-sm">
                             <i data-lucide="pencil" class="w-4 h-4"></i>
                         </button>
                     </td>
                 </tr>`;
-            }).join('') || '<tr><td colspan="4" class="py-10 text-center text-slate-400 italic">No hi ha registres.</td></tr>';
+            }).join('') || '<tr><td colspan="5" class="py-10 text-center text-slate-400 italic">No hi ha registres.</td></tr>';
             lucide.createIcons();
         }
 
@@ -1442,6 +1435,7 @@
                 document.getElementById('edit-date-picker').value = `${y}-${m.toString().padStart(2,'0')}-${d.toString().padStart(2,'0')}`;
                 const hparts = row.hora.split(':');
                 document.getElementById('edit-time-picker').value = `${hparts[0].padStart(2,'0')}:${hparts[1].padStart(2,'0')}:${(hparts[2] || '00').padStart(2,'0')}`;
+                document.getElementById('edit-obs').value = row.observacions || '';
                 
                 delBtn.classList.remove('hidden');
                 saveBtn.innerText = "Desar Canvis";
@@ -1453,6 +1447,7 @@
                 document.getElementById('edit-tipus').value = "ENTRADA";
                 document.getElementById('edit-date-picker').value = new Date().toISOString().split('T')[0];
                 document.getElementById('edit-time-picker').value = "09:00:00";
+                document.getElementById('edit-obs').value = "";
                 
                 delBtn.classList.add('hidden');
                 saveBtn.innerText = "Crear Registre";
@@ -1469,9 +1464,9 @@
 
         async function saveEdit() {
             const rowNum = document.getElementById('edit-row-num').value;
+            const niu = document.getElementById('edit-niu').value;
             const dateVal = document.getElementById('edit-date-picker').value;
             const timeVal = document.getElementById('edit-time-picker').value;
-            const niu = document.getElementById('edit-niu').value;
             
             if(!dateVal || !timeVal || !niu) {
                 alert("NIU, Data i Hora són obligatoris."); return;
@@ -1488,7 +1483,8 @@
                 nom: document.getElementById('edit-nom').value,
                 data: formattedDate,
                 hora: formattedTime,
-                tipus: document.getElementById('edit-tipus').value
+                tipus: document.getElementById('edit-tipus').value,
+                observacions: document.getElementById('edit-obs').value
             };
 
             const btn = document.getElementById('btn-save-edit');
@@ -1569,7 +1565,6 @@
                         }
                     }
                 });
-                if (lastIn !== null) hasIncidencia = true; 
                 
                 const isDeleted = !activeUsersList.includes(niu.toString());
                 const isOrange = isDeleted || hasIncidencia;
@@ -1598,8 +1593,8 @@
 
         function exportToCSV() {
             if (filteredDataForExport.length === 0) return;
-            const headers = "Data,Hora,NIU,Nom,Tipus,Terminal\n";
-            const csvRows = filteredDataForExport.map(r => `${ensureTwoDigitsInDate(r.data)},${r.hora},${r.niu},"${r.nom}",${r.tipus},${r.terminal}`);
+            const headers = "Data,Hora,NIU,Nom,Tipus,Terminal,Observacions\n";
+            const csvRows = filteredDataForExport.map(r => `${ensureTwoDigitsInDate(r.data)},${r.hora},${r.niu},"${r.nom}",${r.tipus},${r.terminal},"${r.observacions || ''}"`);
             const blob = new Blob([headers + csvRows.join("\n")], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
@@ -1607,6 +1602,7 @@
             link.click();
         }
 
+        // --- GESTIÓ DE PERSONES (PESTANYA ID) ---
         async function fetchUsersData() {
             try {
                 const r = await fetch(`${CONFIG.scriptURL}?action=read_users&t=${Date.now()}`);
@@ -1709,6 +1705,7 @@
                 return; 
             }
 
+            // Comprovació de duplicats a la interfície d'administració
             if (!rowNum && activeUsersList.includes(niu.toString())) {
                 if (errorMsg) {
                     errorMsg.innerHTML = "Atenció: Aquest NIU ja consta com a registrat al sistema. Verifiqueu-ho a la llista.";
@@ -1825,6 +1822,7 @@
                 return;
             }
             
+            // Validació extra: Evitem iniciar el procés si detectem que ja està al sistema
             if (activeUsersList.length > 0 && activeUsersList.includes(niu.toString())) {
                 errorMsg.innerHTML = "Aquest NIU ja consta registrat. <br>Tanqueu aquesta finestra i feu servir l'opció <strong>Oblidada?</strong> per recuperar l'accés.";
                 errorMsg.classList.remove('hidden');
