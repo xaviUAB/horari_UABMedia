@@ -15,7 +15,6 @@
         .modal-overlay { background-color: rgba(0,0,0,0.5); }
         .btn-active:active { transform: scale(0.98); }
         
-        /* Animació d'èxit */
         @keyframes popIn {
             0% { transform: scale(0.5); opacity: 0; }
             70% { transform: scale(1.1); opacity: 1; }
@@ -35,12 +34,10 @@
 </head>
 <body class="bg-slate-100 min-h-screen selection:bg-indigo-100 relative">
 
-    <!-- Bàner de connexió perduda -->
     <div id="offline-banner" class="hidden bg-yellow-400 text-yellow-900 px-4 py-2 text-center text-sm font-bold flex items-center justify-center gap-2 shadow-md z-[200] relative">
         <i data-lucide="wifi-off" class="w-4 h-4"></i> Sense connexió. Els registres es desaran localment i s'enviaran en tornar la xarxa.
     </div>
 
-    <!-- Microanimació d'èxit central -->
     <div id="success-overlay" class="hidden fixed inset-0 z-[250] flex items-center justify-center pointer-events-none">
         <div class="bg-white rounded-full p-6 shadow-2xl flex flex-col items-center justify-center gap-4 border-4 border-emerald-500 animate-pop-in">
             <div class="bg-emerald-500 text-white rounded-full p-4">
@@ -72,7 +69,6 @@
             </div>
         </header>
 
-        <!-- Pantalla de Bloqueig -->
         <div id="lock-screen" class="hidden bg-white rounded-3xl p-12 shadow-xl border-2 border-dashed border-slate-300 text-center">
             <div class="bg-rose-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
                 <i data-lucide="shield-alert" class="text-rose-600 w-10 h-10"></i>
@@ -92,7 +88,6 @@
             </div>
         </div>
 
-        <!-- Pantalla Principal de Fitxatge -->
         <div id="main-screen" class="hidden grid lg:grid-cols-12 gap-8">
             <section class="lg:col-span-8 bg-white rounded-3xl p-8 shadow-sm border border-slate-200">
                 <div class="max-w-2xl mx-auto">
@@ -112,6 +107,10 @@
                         <div class="relative">
                             <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1 tracking-wider">Paraula de pas</label>
                             <input type="password" id="input-pass" placeholder="••••••••" class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-400 focus:bg-white outline-none font-mono transition-all" onkeydown="if(event.key === 'Enter') executeRecommendedAction()">
+                        </div>
+                        <div class="relative">
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1 tracking-wider">Observacions (Opcional)</label>
+                            <input type="text" id="input-obs" placeholder="Tasques realitzades, incidències..." class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-400 focus:bg-white outline-none transition-all" onkeydown="if(event.key === 'Enter') executeRecommendedAction()">
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-4">
@@ -140,12 +139,11 @@
                     </button>
                 </div>
                 <div id="user-history" class="space-y-3 flex-grow overflow-y-auto pr-2 custom-scrollbar text-center py-10 text-slate-400 italic text-sm">
-                    Fes un registre per veure l'historial.
+                    Fes un registre per veure l'historial d'aquest terminal.
                 </div>
             </section>
         </div>
 
-        <!-- Dashboard Admin -->
         <div id="admin-dashboard" class="hidden fixed inset-0 bg-slate-50 z-50 overflow-y-auto">
             <div class="max-w-7xl mx-auto p-4 md:p-8">
                 <div class="flex items-center justify-between mb-8 flex-wrap gap-4">
@@ -506,7 +504,7 @@
 
     <script>
         const CONFIG = {
-            scriptURL: "https://script.google.com/macros/s/AKfycbxZF4jOZr1-fpksG0V2dMwhJGYIG-T21b0zxEOPr67qjjvFBXVvx0WQRlyk9gx5FUryhQ/exec",
+            scriptURL: "https://script.google.com/macros/s/AKfycbwI9sIi4JXRKGBUHrLKz8ZE2U07eGEE0cCiZy9pfatvacC7gkSxPgQ8AP2rkQVJtJpt/exec",
             adminPassHash: "1ecd114209a0584719049b0bea1cd348a2b4e9cbddb7aad9bb69396ca7750f9e",
             terminalTokenKey: "horari_terminal_auth_v3"
         };
@@ -551,10 +549,7 @@
 
         window.onload = async () => {
             currentDeviceID = await getDeviceFingerprintID();
-            
             updateClock(); setInterval(updateClock, 1000);
-            
-            // Per defecte bloquegem per assegurar la validació
             checkAuthorizationStatus();
 
             window.addEventListener('online', handleNetworkChange);
@@ -568,7 +563,6 @@
             }
         };
 
-        // --- SISTEMA DE XARXA I SINCRONITZACIÓ ---
         function handleNetworkChange() {
             const banner = document.getElementById('offline-banner');
             if (!navigator.onLine) {
@@ -706,7 +700,7 @@
             const main = document.getElementById('main-screen');
             main.classList.remove('hidden'); 
             lock.classList.add('hidden'); 
-            document.getElementById('status-badge').innerHTML = `<span class="text-emerald-600 font-bold flex items-center gap-1"><i data-lucide="shield-check" class="w-4 h-4"></i> Terminal Autoritzat</span>`;
+            document.getElementById('status-badge').innerHTML = `<span class="text-emerald-600 font-bold flex items-center gap-1"><i data-lucide="shield-check" class="w-4 h-4"></i> Terminal Verificat</span>`;
             lucide.createIcons();
             const inputNiu = document.getElementById('input-niu');
             if(inputNiu) inputNiu.focus();
@@ -816,6 +810,7 @@
                 return;
             }
             
+            const originalHtml = btn.innerHTML;
             btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Revocant...`;
             lucide.createIcons();
 
@@ -831,9 +826,7 @@
             } catch(e) {
                 alert("Error al revocar el terminal des del servidor.");
             } finally {
-                btn.dataset.confirmed = "";
-                btn.innerHTML = `<i data-lucide="laptop" class="w-4 h-4"></i> Revocar Terminal`;
-                btn.className = "bg-rose-100 text-rose-700 px-4 py-2 rounded-xl font-bold hover:bg-rose-200 flex items-center gap-2 shadow-sm transition-all";
+                btn.innerHTML = originalHtml;
                 lucide.createIcons();
             }
         }
@@ -949,7 +942,6 @@
             }
         }
 
-        // --- FITXATGES AMB VALIDACIÓ ---
         function closeAuthErrorModal() {
             document.getElementById('auth-error-modal').classList.add('hidden');
             const passField = document.getElementById('input-pass');
@@ -985,8 +977,10 @@
 
             const niuField = document.getElementById('input-niu');
             const passField = document.getElementById('input-pass');
+            const obsField = document.getElementById('input-obs');
             const niu = niuField.value.trim();
             const pass = passField.value.trim();
+            const obs = obsField ? obsField.value.trim() : "";
             
             if (!niu || !pass) {
                 playTone('error');
@@ -1008,7 +1002,8 @@
                 pass: pass,
                 nom: "", 
                 tipus: tipus, 
-                terminal: currentDeviceID
+                terminal: currentDeviceID,
+                observacions: obs
             };
 
             const btn = tipus === 'ENTRADA' ? document.getElementById('btn-entrada-main') : document.getElementById('btn-sortida-main');
@@ -1040,6 +1035,7 @@
                 historyTimeout = setTimeout(clearHistoryFromScreen, 15000);
                 
                 niuField.value = '';
+                if(obsField) obsField.value = '';
                 checkRecommendedAction(); 
                 niuField.focus();
 
@@ -1113,6 +1109,7 @@
                 showMessage(`Fet! ${tipus} correcte per a ${result.nom}.${durationMsg}`, "success");
                 
                 niuField.value = '';
+                if(obsField) obsField.value = '';
                 checkRecommendedAction(); 
                 niuField.focus();
 
@@ -1179,11 +1176,12 @@
             document.getElementById('user-history').innerHTML = "Fes un registre per veure l'historial d'aquest terminal."; 
             document.getElementById('input-niu').value = '';
             document.getElementById('input-pass').value = '';
+            const obsField = document.getElementById('input-obs');
+            if(obsField) obsField.value = '';
             checkRecommendedAction();
             document.getElementById('input-niu').focus();
         }
 
-        // --- ADMIN / DASHBOARD ---
         async function fetchSheetData() {
             const icon = document.getElementById('refresh-icon'); icon.classList.add('animate-spin');
             const niuSelect = document.getElementById('filter-niu');
@@ -1224,6 +1222,22 @@
             } finally { 
                 icon.classList.remove('animate-spin'); 
             }
+        }
+
+        function navigateUser(direction) {
+            const select = document.getElementById('filter-niu');
+            const total = select.options.length;
+            
+            if (total <= 1) return;
+
+            let currentIndex = select.selectedIndex;
+            let newIndex = currentIndex + direction;
+            
+            if (newIndex < 1) newIndex = total - 1; 
+            if (newIndex >= total) newIndex = 1; 
+            
+            select.selectedIndex = newIndex;
+            applyFilters();
         }
 
         function setQuickFilter(type) {
@@ -1336,24 +1350,6 @@
         function selectNiuFilter(niu) {
             const niuSelect = document.getElementById('filter-niu');
             niuSelect.value = niu;
-            applyFilters();
-        }
-
-        function navigateUser(direction) {
-            const select = document.getElementById('filter-niu');
-            const total = select.options.length;
-            
-            // Si només hi ha l'opció "Totes les persones", no fem res
-            if (total <= 1) return;
-
-            let currentIndex = select.selectedIndex;
-            let newIndex = currentIndex + direction;
-            
-            // Lògica de bucle per saltar-nos "Totes les persones" (índex 0)
-            if (newIndex < 1) newIndex = total - 1; 
-            if (newIndex >= total) newIndex = 1; 
-            
-            select.selectedIndex = newIndex;
             applyFilters();
         }
 
@@ -1473,9 +1469,9 @@
 
         async function saveEdit() {
             const rowNum = document.getElementById('edit-row-num').value;
-            const niu = document.getElementById('edit-niu').value;
             const dateVal = document.getElementById('edit-date-picker').value;
             const timeVal = document.getElementById('edit-time-picker').value;
+            const niu = document.getElementById('edit-niu').value;
             
             if(!dateVal || !timeVal || !niu) {
                 alert("NIU, Data i Hora són obligatoris."); return;
@@ -1573,6 +1569,7 @@
                         }
                     }
                 });
+                if (lastIn !== null) hasIncidencia = true; 
                 
                 const isDeleted = !activeUsersList.includes(niu.toString());
                 const isOrange = isDeleted || hasIncidencia;
@@ -1610,7 +1607,6 @@
             link.click();
         }
 
-        // --- GESTIÓ DE PERSONES (PESTANYA ID) ---
         async function fetchUsersData() {
             try {
                 const r = await fetch(`${CONFIG.scriptURL}?action=read_users&t=${Date.now()}`);
@@ -1713,7 +1709,6 @@
                 return; 
             }
 
-            // Comprovació de duplicats a la interfície d'administració
             if (!rowNum && activeUsersList.includes(niu.toString())) {
                 if (errorMsg) {
                     errorMsg.innerHTML = "Atenció: Aquest NIU ja consta com a registrat al sistema. Verifiqueu-ho a la llista.";
@@ -1830,7 +1825,6 @@
                 return;
             }
             
-            // Validació extra: Evitem iniciar el procés si detectem que ja està al sistema
             if (activeUsersList.length > 0 && activeUsersList.includes(niu.toString())) {
                 errorMsg.innerHTML = "Aquest NIU ja consta registrat. <br>Tanqueu aquesta finestra i feu servir l'opció <strong>Oblidada?</strong> per recuperar l'accés.";
                 errorMsg.classList.remove('hidden');
